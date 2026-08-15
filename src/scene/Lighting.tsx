@@ -37,33 +37,42 @@ export function Lighting() {
       {reflectionsEnabled && effectiveReflection > 0 && (
         <Environment preset="city" environmentIntensity={effectiveReflection} />
       )}
-      <ambientLight intensity={0.25 * effectiveStudio} color={0x52483d} />
+      {/* Studio Ambient & Environmental Fill */}
+      <ambientLight intensity={0.45 * effectiveStudio} color={lightWarmth} />
 
       {/* Desk Lamp Focused Key Spotlight */}
       <spotLight
         ref={keySpot}
         position={[-14.8, 24.9, 2.5]}
         angle={0.72}
-        penumbra={0.5}
-        intensity={160 * effectiveDeskLamp}
+        penumbra={0.55}
+        intensity={380 * effectiveDeskLamp}
         color={deskLampWarmth}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0002}
         target-position={[0, 10, 0]}
       />
-      <pointLight position={[-14.8, 24.9, 2.5]} intensity={12 * effectiveDeskLamp} color={deskLampWarmth} />
+      <pointLight position={[-14.8, 24.9, 2.5]} intensity={32 * effectiveDeskLamp} color={deskLampWarmth} />
 
-      {/* Studio Fill Lighting */}
+      {/* Studio Main Key Spotlight */}
       <spotLight
-        position={[26, 17, 32]}
-        angle={0.9}
-        penumbra={0.8}
-        intensity={45 * effectiveStudio}
+        position={[24, 22, 28]}
+        angle={0.85}
+        penumbra={0.75}
+        intensity={850 * effectiveStudio}
         color={lightWarmth}
-        target-position={[0, 9, 0]}
+        target-position={[0, 8, 0]}
       />
-      <directionalLight position={[18, 16, -26]} intensity={0.4 * effectiveStudio} color={0xa9bed8} />
+
+      {/* Studio Key Directional Overhead */}
+      <directionalLight position={[12, 24, 16]} intensity={1.6 * effectiveStudio} color={lightWarmth} />
+
+      {/* Studio Soft Rim Light */}
+      <directionalLight position={[-18, 16, -24]} intensity={0.9 * effectiveStudio} color={0xa9bed8} />
+
+      {/* Studio Front Diffuse Point Fill */}
+      <pointLight position={[0, 22, 20]} intensity={65 * effectiveStudio} color={lightWarmth} />
     </group>
   );
 }

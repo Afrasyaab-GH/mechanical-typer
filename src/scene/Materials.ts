@@ -293,7 +293,6 @@ function buildScrewNormalMap(size = 256): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const center = size / 2;
 
-  // Base flat normal (0, 0, 1) -> (128, 128, 255)
   ctx.fillStyle = "rgb(128, 128, 255)";
   ctx.fillRect(0, 0, size, size);
 
@@ -331,7 +330,6 @@ function buildScrewNormalMap(size = 256): THREE.CanvasTexture {
         }
       }
 
-      // Normalize vector
       const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
       nx /= len;
       ny /= len;
@@ -349,6 +347,391 @@ function buildScrewNormalMap(size = 256): THREE.CanvasTexture {
   return texture;
 }
 
+/** Linear brushed metal diffuse map (nickel, chrome, polished steel). */
+function buildBrushedMetalTexture(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#e0e0e4";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(89);
+  for (let i = 0; i < 400; i++) {
+    const y = rand() * size;
+    const h = 0.5 + rand() * 1.5;
+    const brightness = 185 + Math.floor(rand() * 70);
+    const alpha = 0.12 + rand() * 0.22;
+    ctx.fillStyle = `rgba(${brightness},${brightness},${brightness + 4},${alpha})`;
+    ctx.fillRect(0, y, size, h);
+  }
+
+  for (let i = 0; i < 180; i++) {
+    const y = rand() * size;
+    const h = 0.5 + rand() * 1.0;
+    const alpha = 0.06 + rand() * 0.14;
+    ctx.fillStyle = `rgba(35,35,40,${alpha})`;
+    ctx.fillRect(0, y, size, h);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/** Linear brushed metal normal map for anisotropic glints. */
+function buildBrushedMetalNormalMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(91);
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  for (let y = 0; y < size; y++) {
+    const freq = Math.sin(y * 0.45) * 14 + Math.sin(y * 1.8) * 8;
+    const noise = (rand() - 0.5) * 16;
+    const slope = Math.min(127, Math.max(-128, Math.round(freq + noise)));
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      data[idx + 1] = Math.min(255, Math.max(0, 128 + slope));
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Brushed metal roughness map. */
+function buildBrushedMetalRoughnessMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(85,85,85)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(93);
+  for (let i = 0; i < 300; i++) {
+    const y = rand() * size;
+    const h = 0.5 + rand() * 2.0;
+    const val = 60 + Math.floor(rand() * 80);
+    ctx.fillStyle = `rgba(${val},${val},${val},0.28)`;
+    ctx.fillRect(0, y, size, h);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Gunmetal / cold-rolled steel diffuse texture. */
+function buildSteelDarkTexture(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#4a4b4e";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(101);
+  for (let i = 0; i < 80; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 15 + rand() * 40;
+    const val = 40 + Math.floor(rand() * 50);
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, `rgba(${val},${val},${val + 5},0.3)`);
+    grad.addColorStop(1, `rgba(${val},${val},${val + 5},0.0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/** Cold-rolled steel normal map. */
+function buildSteelDarkNormalMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(103);
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const noiseX = (rand() - 0.5) * 20;
+    const noiseY = (rand() - 0.5) * 20;
+    data[i] = Math.min(255, Math.max(0, data[i] + noiseX));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noiseY));
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Machined brass diffuse texture. */
+function buildBrassTexture(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#c99a4e";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(113);
+  for (let i = 0; i < 200; i++) {
+    const y = rand() * size;
+    const h = 0.5 + rand() * 2.0;
+    const val = 170 + Math.floor(rand() * 70);
+    const alpha = 0.15 + rand() * 0.25;
+    ctx.fillStyle = `rgba(${val},${Math.floor(val * 0.78)},${Math.floor(val * 0.35)},${alpha})`;
+    ctx.fillRect(0, y, size, h);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/** Machined brass normal map. */
+function buildBrassNormalMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(115);
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  for (let y = 0; y < size; y++) {
+    const freq = Math.sin(y * 0.6) * 12 + (rand() - 0.5) * 10;
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      data[idx + 1] = Math.min(255, Math.max(0, 128 + freq));
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Vulcanized rubber normal map with micropores and extrusion texture. */
+function buildRubberNormalMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(127);
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const noiseX = (rand() - 0.5) * 28;
+    const noiseY = (rand() - 0.5) * 28;
+    data[i] = Math.min(255, Math.max(0, data[i] + noiseX));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noiseY));
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(12, 12);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Vulcanized rubber roughness map. */
+function buildRubberRoughnessMap(size = 512): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(235,235,235)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(129);
+  for (let i = 0; i < 150; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 4 + rand() * 16;
+    const val = 200 + Math.floor(rand() * 45);
+    ctx.fillStyle = `rgba(${val},${val},${val},0.35)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(12, 12);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Woven inked fabric ribbon texture. */
+function buildRibbonTexture(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#121014";
+  ctx.fillRect(0, 0, size, size);
+
+  const step = 4;
+  for (let x = 0; x < size; x += step) {
+    for (let y = 0; y < size; y += step) {
+      const isEven = ((x + y) / step) % 2 === 0;
+      ctx.fillStyle = isEven ? "#26222a" : "#0d0b0f";
+      ctx.fillRect(x, y, step, step);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(16, 4);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/** Woven fabric ribbon normal map. */
+function buildRibbonNormalMap(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  const step = 4;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const modX = x % step;
+      const modY = y % step;
+      const nx = (modX - step / 2) * 18;
+      const ny = (modY - step / 2) * 18;
+      data[idx] = Math.min(255, Math.max(0, 128 + nx));
+      data[idx + 1] = Math.min(255, Math.max(0, 128 + ny));
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(16, 4);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Pressed wool felt normal map. */
+function buildFeltNormalMap(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(149);
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const noiseX = (rand() - 0.5) * 35;
+    const noiseY = (rand() - 0.5) * 35;
+    data[i] = Math.min(255, Math.max(0, data[i] + noiseX));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noiseY));
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 8);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
+/** Polished bakelite / dark celluloid diffuse texture. */
+function buildBakeliteTexture(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#1e1d1f";
+  ctx.fillRect(0, 0, size, size);
+
+  const rand = makePRNG(163);
+  for (let i = 0; i < 40; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 20 + rand() * 60;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, "rgba(45,43,48,0.22)");
+    grad.addColorStop(1, "rgba(20,19,22,0.0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 /* ------------------------------------------------------------------ */
 /* Shared PBR texture instances (built once, reused by all materials)  */
 /* ------------------------------------------------------------------ */
@@ -358,6 +741,19 @@ let _enamelRoughness: THREE.CanvasTexture | null = null;
 let _castIronNormal: THREE.CanvasTexture | null = null;
 let _screwTexture: THREE.CanvasTexture | null = null;
 let _screwNormal: THREE.CanvasTexture | null = null;
+let _brushedMetalTexture: THREE.CanvasTexture | null = null;
+let _brushedMetalNormal: THREE.CanvasTexture | null = null;
+let _brushedMetalRoughness: THREE.CanvasTexture | null = null;
+let _steelDarkTexture: THREE.CanvasTexture | null = null;
+let _steelDarkNormal: THREE.CanvasTexture | null = null;
+let _brassTexture: THREE.CanvasTexture | null = null;
+let _brassNormal: THREE.CanvasTexture | null = null;
+let _rubberNormal: THREE.CanvasTexture | null = null;
+let _rubberRoughness: THREE.CanvasTexture | null = null;
+let _ribbonTexture: THREE.CanvasTexture | null = null;
+let _ribbonNormal: THREE.CanvasTexture | null = null;
+let _feltNormal: THREE.CanvasTexture | null = null;
+let _bakeliteTexture: THREE.CanvasTexture | null = null;
 
 function getEnamelNormal(): THREE.CanvasTexture {
   if (!_enamelNormal) _enamelNormal = buildEnamelNormalMap();
@@ -378,6 +774,58 @@ function getScrewTexture(): THREE.CanvasTexture {
 function getScrewNormal(): THREE.CanvasTexture {
   if (!_screwNormal) _screwNormal = buildScrewNormalMap();
   return _screwNormal;
+}
+function getBrushedMetalTexture(): THREE.CanvasTexture {
+  if (!_brushedMetalTexture) _brushedMetalTexture = buildBrushedMetalTexture();
+  return _brushedMetalTexture;
+}
+function getBrushedMetalNormal(): THREE.CanvasTexture {
+  if (!_brushedMetalNormal) _brushedMetalNormal = buildBrushedMetalNormalMap();
+  return _brushedMetalNormal;
+}
+function getBrushedMetalRoughness(): THREE.CanvasTexture {
+  if (!_brushedMetalRoughness) _brushedMetalRoughness = buildBrushedMetalRoughnessMap();
+  return _brushedMetalRoughness;
+}
+function getSteelDarkTexture(): THREE.CanvasTexture {
+  if (!_steelDarkTexture) _steelDarkTexture = buildSteelDarkTexture();
+  return _steelDarkTexture;
+}
+function getSteelDarkNormal(): THREE.CanvasTexture {
+  if (!_steelDarkNormal) _steelDarkNormal = buildSteelDarkNormalMap();
+  return _steelDarkNormal;
+}
+function getBrassTexture(): THREE.CanvasTexture {
+  if (!_brassTexture) _brassTexture = buildBrassTexture();
+  return _brassTexture;
+}
+function getBrassNormal(): THREE.CanvasTexture {
+  if (!_brassNormal) _brassNormal = buildBrassNormalMap();
+  return _brassNormal;
+}
+function getRubberNormal(): THREE.CanvasTexture {
+  if (!_rubberNormal) _rubberNormal = buildRubberNormalMap();
+  return _rubberNormal;
+}
+function getRubberRoughness(): THREE.CanvasTexture {
+  if (!_rubberRoughness) _rubberRoughness = buildRubberRoughnessMap();
+  return _rubberRoughness;
+}
+function getRibbonTexture(): THREE.CanvasTexture {
+  if (!_ribbonTexture) _ribbonTexture = buildRibbonTexture();
+  return _ribbonTexture;
+}
+function getRibbonNormal(): THREE.CanvasTexture {
+  if (!_ribbonNormal) _ribbonNormal = buildRibbonNormalMap();
+  return _ribbonNormal;
+}
+function getFeltNormal(): THREE.CanvasTexture {
+  if (!_feltNormal) _feltNormal = buildFeltNormalMap();
+  return _feltNormal;
+}
+function getBakeliteTexture(): THREE.CanvasTexture {
+  if (!_bakeliteTexture) _bakeliteTexture = buildBakeliteTexture();
+  return _bakeliteTexture;
 }
 
 /* ------------------------------------------------------------------ */
@@ -408,22 +856,22 @@ export function buildMaterials(theme: MachineTheme = "midnight"): MachineMateria
   return {
     enamel: new THREE.MeshPhysicalMaterial({
       color: colors.main,
-      roughness: 0.42,
+      roughness: 0.40,
       metalness: 0.08,
-      clearcoat: 0.15,
-      clearcoatRoughness: 0.25,
+      clearcoat: 0.22,
+      clearcoatRoughness: 0.22,
       normalMap: getEnamelNormal(),
-      normalScale: new THREE.Vector2(0.35, 0.35),
+      normalScale: new THREE.Vector2(0.55, 0.55),
       roughnessMap: getEnamelRoughness(),
     }),
     enamelPanel: new THREE.MeshPhysicalMaterial({
       color: colors.panel,
-      roughness: 0.45,
+      roughness: 0.42,
       metalness: 0.08,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.3,
+      clearcoat: 0.18,
+      clearcoatRoughness: 0.26,
       normalMap: getEnamelNormal(),
-      normalScale: new THREE.Vector2(0.3, 0.3),
+      normalScale: new THREE.Vector2(0.48, 0.48),
       roughnessMap: getEnamelRoughness(),
     }),
     castIron: new THREE.MeshStandardMaterial({
@@ -431,10 +879,14 @@ export function buildMaterials(theme: MachineTheme = "midnight"): MachineMateria
       roughness: 0.72,
       metalness: 0.25,
       normalMap: getCastIronNormal(),
-      normalScale: new THREE.Vector2(0.6, 0.6),
+      normalScale: new THREE.Vector2(0.65, 0.65),
     }),
     nickel: new THREE.MeshStandardMaterial({
-      color: 0xd8d8d8,
+      color: 0xd8d8dc,
+      map: getBrushedMetalTexture(),
+      roughnessMap: getBrushedMetalRoughness(),
+      normalMap: getBrushedMetalNormal(),
+      normalScale: new THREE.Vector2(0.45, 0.45),
       roughness: 0.32,
       metalness: 0.88,
     }),
@@ -447,48 +899,68 @@ export function buildMaterials(theme: MachineTheme = "midnight"): MachineMateria
       normalScale: new THREE.Vector2(0.8, 0.8),
     }),
     steelDark: new THREE.MeshStandardMaterial({
-      color: 0x5a5a5c,
-      roughness: 0.45,
+      color: 0x4a4a4d,
+      map: getSteelDarkTexture(),
+      normalMap: getSteelDarkNormal(),
+      normalScale: new THREE.Vector2(0.5, 0.5),
+      roughness: 0.52,
       metalness: 0.82,
     }),
     brass: new THREE.MeshStandardMaterial({
       color: 0xb89248,
-      roughness: 0.38,
-      metalness: 0.82,
+      map: getBrassTexture(),
+      normalMap: getBrassNormal(),
+      normalScale: new THREE.Vector2(0.55, 0.55),
+      roughness: 0.36,
+      metalness: 0.84,
     }),
     keyRim: new THREE.MeshStandardMaterial({
       color: 0x222222,
-      roughness: 0.38,
+      map: getBakeliteTexture(),
+      normalMap: getScrewNormal(),
+      normalScale: new THREE.Vector2(0.3, 0.3),
+      roughness: 0.32,
       metalness: 0.75,
     }),
     keyTop: new THREE.MeshStandardMaterial({
-      color: 0xe9e0c8,
-      roughness: 0.28,
-      metalness: 0.05,
+      color: 0xeae2cb,
+      roughness: 0.22,
+      metalness: 0.04,
     }),
     rubber: new THREE.MeshStandardMaterial({
-      color: 0x181818,
-      roughness: 0.94,
-      metalness: 0.0,
+      color: 0x161616,
+      normalMap: getRubberNormal(),
+      normalScale: new THREE.Vector2(0.75, 0.75),
+      roughnessMap: getRubberRoughness(),
+      roughness: 0.92,
+      metalness: 0.02,
     }),
     ribbon: new THREE.MeshStandardMaterial({
-      color: 0x121014,
-      roughness: 0.9,
+      color: 0x141216,
+      map: getRibbonTexture(),
+      normalMap: getRibbonNormal(),
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      roughness: 0.92,
       metalness: 0.0,
       side: THREE.DoubleSide,
     }),
     bellMetal: new THREE.MeshStandardMaterial({
-      color: 0xb89248,
-      roughness: 0.38,
-      metalness: 0.82,
+      color: 0xc49b4c,
+      map: getBrassTexture(),
+      normalMap: getBrassNormal(),
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      roughness: 0.28,
+      metalness: 0.90,
     }),
     wood: new THREE.MeshStandardMaterial({
       map: buildWoodTexture(),
-      roughness: 0.75,
+      roughness: 0.72,
       metalness: 0.02,
     }),
     felt: new THREE.MeshStandardMaterial({
       color: 0x2b221d,
+      normalMap: getFeltNormal(),
+      normalScale: new THREE.Vector2(0.85, 0.85),
       roughness: 0.98,
       metalness: 0,
     }),
@@ -519,29 +991,30 @@ export function applyReflectionSettings(
   const env = isReflective ? intensity : 0.0;
 
   // Enamel body chassis and panels
-  materials.enamel.clearcoat = isReflective ? 0.15 + coat * 0.35 : 0.0;
-  materials.enamel.clearcoatRoughness = isReflective ? 0.15 : 0.5;
+  materials.enamel.clearcoat = isReflective ? 0.22 + coat * 0.35 : 0.05;
+  materials.enamel.clearcoatRoughness = isReflective ? 0.15 : 0.45;
   materials.enamel.reflectivity = refl;
   materials.enamel.envMapIntensity = env;
-  materials.enamel.roughness = isReflective ? 0.32 : 0.42;
+  materials.enamel.roughness = isReflective ? 0.32 : 0.40;
   materials.enamel.metalness = isReflective ? 0.08 : 0.08;
-  materials.enamel.normalScale.set(0.35, 0.35);
+  materials.enamel.normalScale.set(0.55, 0.55);
   materials.enamel.needsUpdate = true;
 
-  materials.enamelPanel.clearcoat = isReflective ? 0.12 + coat * 0.3 : 0.0;
-  materials.enamelPanel.clearcoatRoughness = isReflective ? 0.18 : 0.5;
+  materials.enamelPanel.clearcoat = isReflective ? 0.18 + coat * 0.3 : 0.04;
+  materials.enamelPanel.clearcoatRoughness = isReflective ? 0.18 : 0.45;
   materials.enamelPanel.reflectivity = refl;
   materials.enamelPanel.envMapIntensity = env;
-  materials.enamelPanel.roughness = isReflective ? 0.35 : 0.45;
+  materials.enamelPanel.roughness = isReflective ? 0.35 : 0.42;
   materials.enamelPanel.metalness = isReflective ? 0.08 : 0.08;
-  materials.enamelPanel.normalScale.set(0.3, 0.3);
+  materials.enamelPanel.normalScale.set(0.48, 0.48);
   materials.enamelPanel.needsUpdate = true;
 
   // Cast iron chassis base
   if (materials.castIron) {
-    materials.castIron.envMapIntensity = isReflective ? env * 0.3 : 0.0;
+    materials.castIron.envMapIntensity = isReflective ? env * 0.35 : 0.0;
     materials.castIron.roughness = isReflective ? 0.65 : 0.72;
     materials.castIron.metalness = isReflective ? 0.3 : 0.25;
+    materials.castIron.normalScale.set(0.65, 0.65);
     materials.castIron.needsUpdate = true;
   }
 
@@ -549,41 +1022,61 @@ export function applyReflectionSettings(
   materials.nickel.envMapIntensity = env;
   materials.nickel.roughness = isReflective ? 0.24 : 0.32;
   materials.nickel.metalness = isReflective ? 0.92 : 0.88;
+  materials.nickel.normalScale.set(isReflective ? 0.45 : 0.65, isReflective ? 0.45 : 0.65);
   materials.nickel.needsUpdate = true;
 
   if (materials.screw) {
     materials.screw.envMapIntensity = env;
     materials.screw.roughness = isReflective ? 0.20 : 0.26;
     materials.screw.metalness = isReflective ? 0.94 : 0.92;
+    materials.screw.normalScale.set(0.8, 0.8);
     materials.screw.needsUpdate = true;
   }
 
-  materials.steelDark.envMapIntensity = env;
-  materials.steelDark.roughness = isReflective ? 0.35 : 0.45;
-  materials.steelDark.metalness = isReflective ? 0.88 : 0.82;
+  materials.steelDark.envMapIntensity = isReflective ? env * 0.85 : 0.0;
+  materials.steelDark.roughness = isReflective ? 0.42 : 0.52;
+  materials.steelDark.metalness = isReflective ? 0.86 : 0.82;
+  materials.steelDark.normalScale.set(isReflective ? 0.5 : 0.7, isReflective ? 0.5 : 0.7);
   materials.steelDark.needsUpdate = true;
 
   materials.brass.envMapIntensity = env;
-  materials.brass.roughness = isReflective ? 0.30 : 0.38;
-  materials.brass.metalness = isReflective ? 0.88 : 0.82;
+  materials.brass.roughness = isReflective ? 0.28 : 0.36;
+  materials.brass.metalness = isReflective ? 0.88 : 0.84;
+  materials.brass.normalScale.set(isReflective ? 0.55 : 0.75, isReflective ? 0.55 : 0.75);
   materials.brass.needsUpdate = true;
 
   materials.bellMetal.envMapIntensity = env;
-  materials.bellMetal.roughness = isReflective ? 0.30 : 0.38;
-  materials.bellMetal.metalness = isReflective ? 0.88 : 0.82;
+  materials.bellMetal.roughness = isReflective ? 0.22 : 0.28;
+  materials.bellMetal.metalness = isReflective ? 0.92 : 0.90;
+  materials.bellMetal.normalScale.set(isReflective ? 0.65 : 0.85, isReflective ? 0.65 : 0.85);
   materials.bellMetal.needsUpdate = true;
 
-  materials.keyRim.envMapIntensity = isReflective ? env * 0.5 : 0.0;
-  materials.keyRim.roughness = isReflective ? 0.32 : 0.38;
-  materials.keyRim.metalness = isReflective ? 0.75 : 0.75;
+  materials.keyRim.envMapIntensity = isReflective ? env * 0.6 : 0.0;
+  materials.keyRim.roughness = isReflective ? 0.26 : 0.32;
+  materials.keyRim.metalness = isReflective ? 0.80 : 0.75;
   materials.keyRim.needsUpdate = true;
 
-  materials.keyTop.envMapIntensity = isReflective ? env * 0.2 : 0.0;
-  materials.keyTop.roughness = isReflective ? 0.24 : 0.28;
+  materials.keyTop.envMapIntensity = isReflective ? env * 0.25 : 0.0;
+  materials.keyTop.roughness = isReflective ? 0.18 : 0.22;
   materials.keyTop.needsUpdate = true;
 
-  materials.wood.envMapIntensity = isReflective ? env * 0.15 : 0.0;
-  materials.wood.roughness = isReflective ? 0.72 : 0.75;
+  materials.rubber.envMapIntensity = isReflective ? env * 0.15 : 0.0;
+  materials.rubber.roughness = 0.92;
+  materials.rubber.normalScale.set(0.75, 0.75);
+  materials.rubber.needsUpdate = true;
+
+  materials.ribbon.envMapIntensity = isReflective ? env * 0.1 : 0.0;
+  materials.ribbon.roughness = 0.92;
+  materials.ribbon.normalScale.set(0.65, 0.65);
+  materials.ribbon.needsUpdate = true;
+
+  materials.felt.envMapIntensity = 0.0;
+  materials.felt.roughness = 0.98;
+  materials.felt.normalScale.set(0.85, 0.85);
+  materials.felt.needsUpdate = true;
+
+  materials.wood.envMapIntensity = isReflective ? env * 0.2 : 0.0;
+  materials.wood.roughness = isReflective ? 0.68 : 0.72;
   materials.wood.needsUpdate = true;
 }
 

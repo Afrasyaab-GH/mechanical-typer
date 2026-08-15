@@ -224,11 +224,20 @@ export function Machine() {
 
     // --- Cutaway shell fade ---
     const targetOpacity = state.cutaway ? 0.13 : 1;
-    if (Math.abs(materials.enamelPanel.opacity - targetOpacity) > 0.01) {
+    if (Math.abs(materials.enamelPanel.opacity - targetOpacity) > 0.005) {
+      const isFading = targetOpacity < 0.99;
       materials.enamelPanel.transparent = true;
       materials.enamelPanel.opacity +=
         (targetOpacity - materials.enamelPanel.opacity) * Math.min(1, deltaMs / 120);
-      materials.enamelPanel.needsUpdate = false;
+      materials.enamelPanel.depthWrite = !isFading;
+      materials.enamelPanel.needsUpdate = true;
+    } else {
+      materials.enamelPanel.opacity = targetOpacity;
+      if (!state.cutaway && materials.enamelPanel.transparent) {
+        materials.enamelPanel.transparent = false;
+        materials.enamelPanel.depthWrite = true;
+        materials.enamelPanel.needsUpdate = true;
+      }
     }
   });
 

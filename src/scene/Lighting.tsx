@@ -38,7 +38,7 @@ export function Lighting() {
         <Environment preset="city" environmentIntensity={effectiveReflection} />
       )}
       {/* Studio Ambient & Environmental Fill */}
-      <ambientLight intensity={0.45 * effectiveStudio} color={lightWarmth} />
+      <ambientLight intensity={0.55 * effectiveStudio} color={lightWarmth} />
 
       {/* Desk Lamp Focused Key Spotlight */}
       <spotLight
@@ -53,26 +53,26 @@ export function Lighting() {
         shadow-bias={-0.0002}
         target-position={[0, 10, 0]}
       />
-      <pointLight position={[-14.8, 24.9, 2.5]} intensity={32 * effectiveDeskLamp} color={deskLampWarmth} />
+      <pointLight position={[-14.8, 24.9, 2.5]} intensity={35 * effectiveDeskLamp} color={deskLampWarmth} />
 
       {/* Studio Main Key Spotlight */}
       <spotLight
-        position={[24, 22, 28]}
-        angle={0.85}
+        position={[24, 24, 28]}
+        angle={0.88}
         penumbra={0.75}
-        intensity={850 * effectiveStudio}
+        intensity={1050 * effectiveStudio}
         color={lightWarmth}
         target-position={[0, 8, 0]}
       />
 
       {/* Studio Key Directional Overhead */}
-      <directionalLight position={[12, 24, 16]} intensity={1.6 * effectiveStudio} color={lightWarmth} />
+      <directionalLight position={[12, 24, 16]} intensity={2.2 * effectiveStudio} color={lightWarmth} />
 
       {/* Studio Soft Rim Light */}
-      <directionalLight position={[-18, 16, -24]} intensity={0.9 * effectiveStudio} color={0xa9bed8} />
+      <directionalLight position={[-18, 18, -24]} intensity={1.2 * effectiveStudio} color={0xa9bed8} />
 
       {/* Studio Front Diffuse Point Fill */}
-      <pointLight position={[0, 22, 20]} intensity={65 * effectiveStudio} color={lightWarmth} />
+      <pointLight position={[0, 22, 20]} intensity={85 * effectiveStudio} color={lightWarmth} />
     </group>
   );
 }

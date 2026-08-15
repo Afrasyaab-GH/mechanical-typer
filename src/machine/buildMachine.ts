@@ -977,31 +977,31 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       (group) => {
         // Escapement mechanism housing / mounting bridge anchored to chassis and cradle
         const housingBridge = boxMesh(3.2, 4.2, 2.8, mats.steelDark);
-        housingBridge.position.set(0, 9.6, -3.1);
+        housingBridge.position.set(0, 9.9, -3.6);
         group.add(housingBridge);
 
         // Precision brass journal sleeve bearings supporting the escapement arbor
         for (const zBearing of [-3.8, -2.2]) {
           const bearing = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.5, 16), mats.brass);
           bearing.rotation.x = Math.PI / 2;
-          bearing.position.set(0, 11.7, zBearing);
+          bearing.position.set(0, 11.1, zBearing - 0.2);
           group.add(bearing);
         }
 
         const inner = new THREE.Group();
-        inner.position.set(0, 11.7, 0);
+        inner.position.set(0, 11.1, 0);
         group.add(inner);
 
         // Hardened steel escapement shaft / arbor spanning from carriage pinion to front bearing
         const arbor = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 16), mats.steelDark);
         arbor.rotation.x = Math.PI / 2;
-        arbor.position.set(0, 0, -3.0);
+        arbor.position.set(0, 0, -3.4);
         inner.add(arbor);
 
         // Hardened steel pinion gear meshing directly with the Carriage Gear Rack at z = -3.7, y = 12.18
         const pinionHub = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.38, 16), mats.steelDark);
         pinionHub.rotation.x = Math.PI / 2;
-        pinionHub.position.set(0, 0, -3.7);
+        pinionHub.position.set(0, 0, -3.05);
         inner.add(pinionHub);
         for (let i = 0; i < 10; i++) {
           const tooth = boxMesh(0.14, 0.28, 0.36, mats.steelDark);
@@ -1014,13 +1014,13 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         // Star wheel hub collar with locking set screw
         const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.22, 14), mats.brass);
         collar.rotation.x = Math.PI / 2;
-        collar.position.set(0, 0, -2.55);
+        collar.position.set(0, 0, -3.35);
         inner.add(collar);
 
         // Escapement brass ratchet star wheel with 15 undercut teeth
         const starWheelBody = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.24, 24), mats.brass);
         starWheelBody.rotation.x = Math.PI / 2;
-        starWheelBody.position.set(0, 0, -2.7);
+        starWheelBody.position.set(0, 0, -3.5);
         inner.add(starWheelBody);
 
         for (let i = 0; i < 15; i++) {
@@ -1069,20 +1069,20 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       group.add(rockerCarrier);
 
       // Rigid Dog (holding pawl) - fixed hardened steel tooth engaging star wheel
-      const rigidDog = boxMesh(0.24, 0.9, 0.22, mats.steelDark);
-      rigidDog.position.set(0.42, 12.15, -2.65);
+      const rigidDog = boxMesh(0.24, 0.9, 1.4, mats.steelDark);
+      rigidDog.position.set(0.42, 12.15, -3.2);
       rigidDog.rotation.z = -0.28;
       group.add(rigidDog);
 
       // Loose Dog (stepping pawl) - pivoting spring-loaded dog
-      const looseDog = boxMesh(0.22, 0.95, 0.2, mats.nickel);
-      looseDog.position.set(-0.42, 12.2, -2.65);
+      const looseDog = boxMesh(0.22, 0.95, 1.4, mats.nickel);
+      looseDog.position.set(-0.42, 12.2, -3.2);
       looseDog.rotation.z = 0.28;
       group.add(looseDog);
 
       // Tiny bronze leaf spring on loose dog
       const leafSpring = boxMesh(0.06, 0.55, 0.12, mats.brass);
-      leafSpring.position.set(-0.62, 11.9, -2.65);
+      leafSpring.position.set(-0.62, 11.9, -3.0);
       group.add(leafSpring);
 
       // Lower rocker trip horn receiving pushrod from Universal Bar
@@ -1197,12 +1197,12 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       // Precision steel escapement gear rack
       const rackBase = boxMesh(22, 0.45, 0.55, mats.steelDark);
-      rackBase.position.set(0, 12.35, -3.05);
+      rackBase.position.set(0, 11.35, -3.05);
       group.add(rackBase);
 
       for (let i = 0; i < 44; i++) {
         const tooth = boxMesh(0.12, 0.24, 0.32, mats.steelDark);
-        tooth.position.set(-10.75 + i * 0.5, 12.18, -3.05);
+        tooth.position.set(-10.75 + i * 0.5, 11.18, -3.05);
         group.add(tooth);
       }
       return null;

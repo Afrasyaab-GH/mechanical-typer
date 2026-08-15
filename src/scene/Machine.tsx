@@ -206,12 +206,12 @@ export function Machine() {
     }
 
     // --- Paper scroll easing ---
-    const targetLine =
+    const activeGlobalLine =
       state.feedMode === "scroll"
         ? manuscript.cursor.page * 44 + manuscript.cursor.line
         : manuscript.cursor.line;
-    paperLineRef.current += (targetLine - paperLineRef.current) * Math.min(1, deltaMs / 90);
-    if (Math.abs(paperLineRef.current - targetLine) < 0.002) paperLineRef.current = targetLine;
+    paperLineRef.current += (activeGlobalLine - paperLineRef.current) * Math.min(1, deltaMs / 90);
+    if (Math.abs(paperLineRef.current - activeGlobalLine) < 0.002) paperLineRef.current = activeGlobalLine;
     build.refs.updatePaper(paperLineRef.current, state.feedMode);
 
     // --- Cutaway shell fade ---

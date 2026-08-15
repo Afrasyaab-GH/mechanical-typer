@@ -170,14 +170,18 @@ export class PaperTexture {
     });
   }
 
-  repaint(feedMode: "sheet" | "scroll" = this.feedMode): void {
+  repaint(feedMode: "sheet" | "scroll" = this.feedMode, activeGlobalLine?: number): void {
     this.feedMode = feedMode;
+    const currentGlobalLine =
+      activeGlobalLine !== undefined
+        ? activeGlobalLine
+        : this.manuscript.cursor.page * 44 + this.manuscript.cursor.line;
+
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.background, 0, 0);
 
-    // Draw dynamic configurable page title centered at y = 160px
-    if (this.documentTitle) {
+    if (this.documentTitle && feedMode === "sheet") {
       ctx.font = `600 36px "Courier Prime", monospace`;
       ctx.fillStyle = "#332e24";
       ctx.textAlign = "center";
@@ -187,7 +191,7 @@ export class PaperTexture {
     }
 
     if (feedMode === "sheet") {
-      // Standard A4 page drawing
+      // Standard A4 single page
       const page = Math.min(this.manuscript.cursor.page, this.manuscript.pages.length - 1);
       const rows = this.manuscript.pages[page] ?? [];
       for (const line of rows) {
@@ -196,17 +200,34 @@ export class PaperTexture {
         }
       }
     } else {
-      // Continuous Scroll Mode: draw all lines from all pages in continuous sequence
-      // Collect all glyphs into a flattened array of global lines
+      // Continuous Scroll Mode: ONLY draw lines within the active loop window (e.g. 36 lines)
+      // Older lines are pruned from the canvas texture so returning paper is 100% BLANK
+      const LOOP_CAPACITY = 36; // Maximum lines physically visible on the 3D loop
+      const minVisibleLine = Math.max(0, currentGlobalLine - LOOP_CAPACITY + 2);
+      const lineSpacing = PAPER.TEXT_H / LOOP_CAPACITY;
+
+      // Collect and flatten only the glyphs in the active visible window [minVisibleLine, currentGlobalLine]
       for (let p = 0; p < this.manuscript.pages.length; p++) {
         const pageRows = this.manuscript.pages[p] ?? [];
         for (let l = 0; l < pageRows.length; l++) {
-          const globalLine = p * 44 + l;
-          for (const glyph of pageRows[l]) {
-            // Map globalLine cyclically onto the canvas height
-            const cyclicLine = globalLine % 44;
-            const cyclicGlyph = { ...glyph, line: cyclicLine };
-            this.drawGlyph(cyclicGlyph);
+          const gLine = p * 44 + l;
+          if (gLine >= minVisibleLine && gLine <= currentGlobalLine) {
+            // Map gLine cyclically across canvas height without overlapping older text
+            const cyclicLine = gLine % LOOP_CAPACITY;
+            for (const glyph of pageRows[l]) {
+              const cyclicGlyph = { ...glyph, line: cyclicLine };
+
+              const x = PAPER.MARGIN_X + cyclicGlyph.col * PAPER.CELL_W + cyclicGlyph.xJitter * 1.5;
+              const y =
+                PAPER.MARGIN_TOP +
+                cyclicGlyph.line * lineSpacing +
+                lineSpacing * 0.76 +
+                cyclicGlyph.yJitter * 1.5;
+
+              ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", monospace`;
+              ctx.fillStyle = `rgba(17, 17, 17, ${cyclicGlyph.inkOpacity.toFixed(3)})`;
+              ctx.fillText(cyclicGlyph.char, x, y);
+            }
           }
         }
       }

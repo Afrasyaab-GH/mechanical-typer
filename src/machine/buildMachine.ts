@@ -238,8 +238,8 @@ export function samplePaperGuidePath(s: number, p: PaperPathParams): [number, nu
     const distFromRoller = sTrayEnd - s; // positive distance up the rear tray
     const lipY = cy;
     const lipZ = cz - r;
-    const y = lipY + distFromRoller * Math.cos(feedAngle) + 0.03 * Math.sin(feedAngle);
-    const z = lipZ - distFromRoller * Math.sin(feedAngle) + 0.03 * Math.cos(feedAngle);
+    const y = lipY + distFromRoller * Math.cos(feedAngle) + 0.08 * Math.sin(feedAngle);
+    const z = lipZ - distFromRoller * Math.sin(feedAngle) + 0.08 * Math.cos(feedAngle);
     return [y, z];
   }
 
@@ -248,8 +248,8 @@ export function samplePaperGuidePath(s: number, p: PaperPathParams): [number, nu
     const tArc = (s - sTrayEnd) / arcLength; // 0.0 to 1.0
     // Angle: -PI (rear lip) -> -PI/2 (bottom) -> 0 (front horizon)
     const theta = -Math.PI + tArc * Math.PI;
-    const y = cy + (r + 0.03) * Math.sin(theta);
-    const z = cz + (r + 0.03) * Math.cos(theta);
+    const y = cy + (r + 0.08) * Math.sin(theta);
+    const z = cz + (r + 0.08) * Math.cos(theta);
     return [y, z];
   }
 
@@ -257,7 +257,7 @@ export function samplePaperGuidePath(s: number, p: PaperPathParams): [number, nu
   const distFromHorizon = s - sArcEnd;
   const tilt = 0.14; // ~8 deg rear tilt
   const y = cy + distFromHorizon * Math.cos(tilt);
-  const z = cz + (r + 0.03) - distFromHorizon * Math.sin(tilt);
+  const z = cz + (r + 0.08) - distFromHorizon * Math.sin(tilt);
   return [y, z];
 }
 
@@ -379,9 +379,9 @@ function buildPaperMesh(paper: PaperTexture): {
 
   const loopParams: LoopPathParams = {
     platenCenter: new THREE.Vector3(0, PLATEN.y, PLATEN.z),
-    platenRadius: PLATEN.r + 0.03,
+    platenRadius: PLATEN.r + 0.08, // Increased from 0.03 to 0.08 (0.8mm clearance)
     topCenter: new THREE.Vector3(0, PLATEN.y + 10.5, PLATEN.z - 1.4),
-    topRadius: 0.45 + 0.02,
+    topRadius: 0.45 + 0.04,
   };
 
   const sArcEnd = pathParams.trayLength + Math.PI * pathParams.platenRadius;
@@ -1137,8 +1137,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       const paperWidth = 21.0;
       const cy = PLATEN.y;
       const cz = PLATEN.z;
-      const bailY = 16.12;
-      const bailZ = -1.46; // Forward (+Z) of paper surface at Z = -1.69
+      const bailY = PLATEN.y + (PLATEN.r + 0.24) * 0.72;
+      const bailZ = PLATEN.z + (PLATEN.r + 0.24) * 0.78;
 
       group.position.set(0, bailY, bailZ);
 

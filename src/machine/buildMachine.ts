@@ -72,22 +72,66 @@ function keycapTexture(top: string, bottom: string): THREE.CanvasTexture {
   return texture;
 }
 
-/** Type-slug face texture (both symbols on the slug). */
+/** Type-slug face texture (both symbols on the slug with embossed metallic relief). */
 function slugTexture(lower: string, upper: string): THREE.CanvasTexture {
   const key = `slug|${lower}|${upper}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 96;
+  canvas.width = 128;
+  canvas.height = 192;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#20201f";
-  ctx.fillRect(0, 0, 64, 96);
-  ctx.fillStyle = "#b8b2a4";
-  ctx.textAlign = "center";
-  ctx.font = '600 30px "Courier Prime", monospace';
-  ctx.fillText(upper, 32, 36);
-  ctx.fillText(lower, 32, 76);
+
+  // Brushed steel background
+  const grad = ctx.createLinearGradient(0, 0, 128, 192);
+  grad.addColorStop(0, "#282a2d");
+  grad.addColorStop(0.5, "#3b3d42");
+  grad.addColorStop(1, "#242528");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 192);
+
+  // Outer bevel rim
+  ctx.strokeStyle = "#5a5e66";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, 120, 184);
+
+  // Central dividing slot groove
+  ctx.strokeStyle = "#161719";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(6, 96);
+  ctx.lineTo(122, 96);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#727680";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(6, 99);
+  ctx.lineTo(122, 99);
+  ctx.stroke();
+
+  // Embossed Character dies (Upper case top, Lower case bottom)
+  const renderDie = (char: string, yPos: number) => {
+    ctx.font = '700 56px "Courier Prime", monospace';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Dark inset shadow
+    ctx.fillStyle = "#101012";
+    ctx.fillText(char, 66, yPos + 2);
+
+    // Light relief bevel highlight
+    ctx.fillStyle = "#9498a2";
+    ctx.fillText(char, 62, yPos - 2);
+
+    // Stamped metallic face
+    ctx.fillStyle = "#e2e6ec";
+    ctx.fillText(char, 64, yPos);
+  };
+
+  renderDie(upper, 48);
+  renderDie(lower, 144);
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   textureCache.set(key, texture);
@@ -173,6 +217,7 @@ export interface MachineRefs {
   returnLeverAction: THREE.Object3D;
   bellAction: THREE.Object3D;
   ribbonSideL: THREE.Mesh;
+  ribbonCenter: THREE.Mesh;
   ribbonSideR: THREE.Mesh;
   ribbonTipL: THREE.Vector3;
   ribbonTipR: THREE.Vector3;
@@ -535,6 +580,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     returnLeverAction: new THREE.Group(),
     bellAction: new THREE.Group(),
     ribbonSideL: new THREE.Mesh(),
+    ribbonCenter: new THREE.Mesh(),
     ribbonSideR: new THREE.Mesh(),
     ribbonTipL: new THREE.Vector3(),
     ribbonTipR: new THREE.Vector3(),
@@ -718,24 +764,64 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         group.rotation.x = restAngle;
         const inner = new THREE.Group();
         group.add(inner);
-        const bar = boxMesh(0.2, barLength, 0.4, isIme ? mats.brass : mats.nickel);
-        bar.position.y = barLength / 2;
-        bar.castShadow = true;
-        inner.add(bar);
-        const tail = boxMesh(0.18, 1.4, 0.36, mats.steelDark);
-        tail.position.y = -0.7;
+
+        // 1. Tapered Shank (Pivot heel: w 0.28, d 0.45 -> Neck: w 0.16, d 0.32)
+        const shankGeom = new THREE.CylinderGeometry(0.08, 0.14, barLength, 12);
+        const shank = new THREE.Mesh(shankGeom, isIme ? mats.brass : mats.steelDark);
+        shank.position.y = barLength / 2;
+        shank.scale.set(1.0, 1.0, 1.8);
+        shank.castShadow = true;
+        inner.add(shank);
+
+        // Pivot heel hub and bushing inside the segment slot
+        const heelHub = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.22, 14), mats.nickel);
+        heelHub.rotation.z = Math.PI / 2;
+        inner.add(heelHub);
+
+        // Lower actuating lever tail extending behind pivot
+        const tail = boxMesh(0.18, 1.2, 0.36, mats.steelDark);
+        tail.position.set(0, -0.6, -0.1);
         inner.add(tail);
-        const slugBlock = boxMesh(0.52, 0.72, 0.34, mats.steelDark);
-        slugBlock.position.y = barLength + 0.2;
-        slugBlock.rotation.x = -1.15;
-        inner.add(slugBlock);
+
+        // Linkage eyelet on tail
+        const eyelet = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.22, 10), mats.nickel);
+        eyelet.position.set(0, -1.0, -0.15);
+        eyelet.rotation.z = Math.PI / 2;
+        inner.add(eyelet);
+
+        // 2. Sculpted alignment tongue (nests into center V-guide on strike)
+        const tongue = boxMesh(0.14, 0.36, 0.28, mats.nickel);
+        tongue.position.set(0, barLength - 0.05, 0.02);
+        tongue.castShadow = true;
+        inner.add(tongue);
+
+        // 3. Beveled Dual Type Slug Block
+        const slugGroup = new THREE.Group();
+        slugGroup.position.set(0, barLength + 0.22, 0);
+        slugGroup.rotation.x = -1.15; // forward relief angle facing platen horizon
+        inner.add(slugGroup);
+
+        // Hardened steel slug body (w: 0.48, h: 0.72, d: 0.30)
+        const slugBody = boxMesh(0.48, 0.72, 0.30, mats.steelDark);
+        slugBody.castShadow = true;
+        slugGroup.add(slugBody);
+
+        // Central horizontal dividing groove on slug sides
+        const slugGroove = boxMesh(0.50, 0.03, 0.31, mats.nickel);
+        slugGroup.add(slugGroove);
+
+        // High-resolution engraved character die face
         const slugFace = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.44, 0.6),
-          new THREE.MeshBasicMaterial({ map: slugTexture(lower, upper) }),
+          new THREE.PlaneGeometry(0.44, 0.68),
+          new THREE.MeshStandardMaterial({
+            map: slugTexture(lower, upper),
+            roughness: 0.32,
+            metalness: 0.85,
+          }),
         );
-        slugFace.position.set(0, barLength + 0.2, 0.18);
-        slugFace.rotation.x = -1.15;
-        inner.add(slugFace);
+        slugFace.position.set(0, 0, 0.155);
+        slugGroup.add(slugFace);
+
         return inner;
       },
     );
@@ -828,6 +914,65 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       rest.rotation.x = Math.PI / 2;
       group.add(rest);
       return null;
+    },
+  );
+
+  addPart(
+    basketGroup,
+    {
+      id: "basket.centerGuide",
+      label: "Center type guide",
+      fn: "V-notch guide captures and aligns typebars at the exact strike point",
+      system: "basket",
+      stagger: 0.55,
+      offset: { py: -1.2, pz: 1.8 },
+      upstream: ["basket.segment"],
+      downstream: ["typebars"],
+    },
+    (group) => {
+      group.position.set(0, 13.85, -1.48);
+      const inner = new THREE.Group();
+      group.add(inner);
+
+      // Stamped mounting foot bracket
+      const base = boxMesh(0.72, 0.38, 0.16, mats.nickel);
+      base.position.set(0, -0.2, 0);
+      base.castShadow = true;
+      inner.add(base);
+
+      // Twin mounting screw caps
+      for (const sx of [-0.22, 0.22]) {
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 10), mats.steelDark);
+        screw.rotation.x = Math.PI / 2;
+        screw.position.set(sx, -0.2, 0.08);
+        inner.add(screw);
+      }
+
+      // Vertical structural spine
+      const stem = boxMesh(0.34, 0.6, 0.14, mats.nickel);
+      stem.position.set(0, 0.22, 0);
+      stem.castShadow = true;
+      inner.add(stem);
+
+      // Twin convergent guide wings forming the precise V-notch at top (y: 14.6, z: -1.46)
+      const wingL = boxMesh(0.12, 0.72, 0.14, mats.nickel);
+      wingL.position.set(-0.32, 0.55, 0.02);
+      wingL.rotation.z = -Math.PI / 9;
+      wingL.castShadow = true;
+      inner.add(wingL);
+
+      const wingR = boxMesh(0.12, 0.72, 0.14, mats.nickel);
+      wingR.position.set(0.32, 0.55, 0.02);
+      wingR.rotation.z = Math.PI / 9;
+      wingR.castShadow = true;
+      inner.add(wingR);
+
+      // Hardened steel rear platen stop plate
+      const backPlate = boxMesh(0.66, 0.52, 0.06, mats.steelDark);
+      backPlate.position.set(0, 0.65, -0.04);
+      inner.add(backPlate);
+
+      return inner;
     },
   );
 
@@ -1449,7 +1594,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       {
         id: "vibrator",
         label: "Ribbon vibrator",
-        fn: "Lifts the ribbon into the strike path",
+        fn: "Bifurcated carrier lifts ribbon into the strike path on keystroke",
         system: "ribbon",
         stagger: 0.63,
         offset: { pz: 4.2, py: 0.8 },
@@ -1457,30 +1602,65 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["paper.sheet"],
       },
       (group) => {
-        group.position.set(0, 12.9, -1.6);
+        group.position.set(0, 12.8, -1.50);
         const inner = new THREE.Group();
         group.add(inner);
-        const topBar = boxMesh(1.7, 0.5, 0.24, mats.nickel);
-        topBar.position.y = 0.55;
-        inner.add(topBar);
-        const armL = boxMesh(0.18, 1.1, 0.2, mats.nickel);
-        armL.position.set(-0.75, 0, 0);
-        inner.add(armL);
-        const armR = boxMesh(0.18, 1.1, 0.2, mats.nickel);
-        armR.position.set(0.75, 0, 0);
-        inner.add(armR);
-        const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.55), mats.ribbon);
-        strip.position.set(0, 0.55, 0.13);
-        inner.add(strip);
+
+        // 1. Sliding vertical actuator stem (w: 0.35, h: 1.8, d: 0.12)
+        const stem = boxMesh(0.35, 1.8, 0.12, mats.nickel);
+        stem.position.set(0, 0.3, 0);
+        stem.castShadow = true;
+        inner.add(stem);
+
+        // Lower actuator link pivot bushing
+        const linkPivot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 12), mats.nickel);
+        linkPivot.position.set(0, -0.6, 0);
+        linkPivot.rotation.x = Math.PI / 2;
+        inner.add(linkPivot);
+
+        // 2. Yoke branching horizontally
+        const yoke = boxMesh(1.9, 0.14, 0.12, mats.nickel);
+        yoke.position.set(0, 1.15, 0);
+        yoke.castShadow = true;
+        inner.add(yoke);
+
+        // 3. Twin Ribbon Guide Ears (Left and Right stamped ears with vertical slots at x = ±0.9)
+        for (const side of [-1, 1]) {
+          const earX = side * 0.9;
+
+          // Outer upright prong
+          const outerProng = boxMesh(0.08, 0.62, 0.12, mats.nickel);
+          outerProng.position.set(earX + side * 0.08, 1.46, 0);
+          outerProng.castShadow = true;
+          inner.add(outerProng);
+
+          // Inner upright prong (creating vertical slot w: 0.08, h: 0.55)
+          const innerProng = boxMesh(0.08, 0.62, 0.12, mats.nickel);
+          innerProng.position.set(earX - side * 0.08, 1.46, 0);
+          innerProng.castShadow = true;
+          inner.add(innerProng);
+
+          // Top retention bridge
+          const topBridge = boxMesh(0.24, 0.08, 0.12, mats.nickel);
+          topBridge.position.set(earX, 1.76, 0);
+          inner.add(topBridge);
+
+          // Curved guide tab curled slightly forward (+Z)
+          const tab = boxMesh(0.06, 0.22, 0.06, mats.nickel);
+          tab.position.set(earX + side * 0.12, 1.46, 0.08);
+          inner.add(tab);
+        }
+
         return inner;
       },
     );
     refs.vibratorAction = action!;
   }
 
-  const makeRibbonSide = (): THREE.Mesh => {
+  const makeRibbonSegment = (): THREE.Mesh => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.55), mats.ribbon);
     mesh.userData.partId = "ribbon.strip";
+    mesh.receiveShadow = true;
     root.add(mesh);
     return mesh;
   };
@@ -1489,7 +1669,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     {
       id: "ribbon.strip",
       label: "Ink ribbon",
-      fn: "Woven inked fabric between slug and sheet",
+      fn: "Woven inked fabric threaded through vibrator fork to platen",
       system: "ribbon",
       stagger: 0.64,
       offset: { py: 2.2 },
@@ -1498,10 +1678,11 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     },
     () => null,
   );
-  refs.ribbonSideL = makeRibbonSide();
-  refs.ribbonSideR = makeRibbonSide();
-  refs.ribbonTipL = new THREE.Vector3(-0.8, SPOOL_Y, -1.6);
-  refs.ribbonTipR = new THREE.Vector3(0.8, SPOOL_Y, -1.6);
+  refs.ribbonSideL = makeRibbonSegment();
+  refs.ribbonCenter = makeRibbonSegment();
+  refs.ribbonSideR = makeRibbonSegment();
+  refs.ribbonTipL = new THREE.Vector3(-0.9, SPOOL_Y, -1.48);
+  refs.ribbonTipR = new THREE.Vector3(0.9, SPOOL_Y, -1.48);
 
   addPart(
     root,

@@ -209,6 +209,52 @@ function buildWoodTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+/**
+ * Procedural woven cotton/silk ink-ribbon fabric normal map.
+ * Generates an authentic micro-woven crosshatch weave pattern.
+ */
+function buildRibbonNormalMap(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  // Interlaced plain-weave warp & weft micro-threads (approx 32 threads across)
+  const threadWidth = 8;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const warp = Math.floor(x / threadWidth) % 2;
+      const weft = Math.floor(y / threadWidth) % 2;
+      const isOver = warp === weft;
+
+      const lx = (x % threadWidth) / threadWidth - 0.5;
+      const ly = (y % threadWidth) / threadWidth - 0.5;
+
+      const nx = isOver ? Math.sin(lx * Math.PI) * 45 : (Math.random() - 0.5) * 12;
+      const ny = !isOver ? Math.sin(ly * Math.PI) * 45 : (Math.random() - 0.5) * 12;
+
+      const idx = (y * size + x) * 4;
+      data[idx] = Math.min(255, Math.max(0, 128 + Math.round(nx)));
+      data[idx + 1] = Math.min(255, Math.max(0, 128 + Math.round(ny)));
+      data[idx + 2] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(12, 3);
+  texture.colorSpace = THREE.NoColorSpace;
+  return texture;
+}
+
 /* ------------------------------------------------------------------ */
 /* Shared PBR texture instances (built once, reused by all materials)  */
 /* ------------------------------------------------------------------ */
@@ -216,6 +262,7 @@ function buildWoodTexture(): THREE.CanvasTexture {
 let _enamelNormal: THREE.CanvasTexture | null = null;
 let _enamelRoughness: THREE.CanvasTexture | null = null;
 let _castIronNormal: THREE.CanvasTexture | null = null;
+let _ribbonNormal: THREE.CanvasTexture | null = null;
 
 function getEnamelNormal(): THREE.CanvasTexture {
   if (!_enamelNormal) _enamelNormal = buildEnamelNormalMap();
@@ -228,6 +275,10 @@ function getEnamelRoughness(): THREE.CanvasTexture {
 function getCastIronNormal(): THREE.CanvasTexture {
   if (!_castIronNormal) _castIronNormal = buildCastIronNormalMap();
   return _castIronNormal;
+}
+function getRibbonNormal(): THREE.CanvasTexture {
+  if (!_ribbonNormal) _ribbonNormal = buildRibbonNormalMap();
+  return _ribbonNormal;
 }
 
 /* ------------------------------------------------------------------ */
@@ -334,9 +385,11 @@ export function buildMaterials(theme: MachineTheme = "midnight"): MachineMateria
       metalness: 0.02,
     }),
     ribbon: new THREE.MeshStandardMaterial({
-      color: 0x151218,
-      roughness: 0.88,
-      metalness: 0,
+      color: 0x111014,
+      roughness: 0.82,
+      metalness: 0.04,
+      normalMap: getRibbonNormal(),
+      normalScale: new THREE.Vector2(0.35, 0.35),
       side: THREE.DoubleSide,
     }),
     bellMetal: new THREE.MeshStandardMaterial({

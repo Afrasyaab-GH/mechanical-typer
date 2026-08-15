@@ -203,6 +203,8 @@ function poseOf(object: THREE.Object3D): Pose {
 /* Paper sheet & Over-the-Top Conveyor Loop                            */
 /* ------------------------------------------------------------------ */
 
+export const SCROLL_LOOP_LINES = 48; // Total lines around complete 3D ribbon circuit
+
 export interface PaperPathParams {
   platenCenter: THREE.Vector3;
   platenRadius: number;
@@ -395,6 +397,9 @@ function buildPaperMesh(paper: PaperTexture): {
   const L3 = Math.sqrt(dy3 * dy3 + dz3 * dz3);
   const L4 = Math.PI * loopParams.platenRadius;
   const loopTotalLength = L1 + L2 + L3 + L4;
+  const LINE_FEED_3D_LOOP = loopTotalLength / SCROLL_LOOP_LINES; // Exact 3D units per line in scroll mode
+  const LINE_FEED_3D_SHEET = (67.0 / 3508.0) * sheetLength;     // Sheet mode line feed
+  void LINE_FEED_3D_LOOP;
 
   let currentMode: "sheet" | "scroll" = "scroll";
   let currentLine = 0;
@@ -403,42 +408,48 @@ function buildPaperMesh(paper: PaperTexture): {
     if (mode !== undefined) currentMode = mode;
     currentLine = line;
 
-    const LINE_FEED_3D = (67.0 / 3508.0) * sheetLength; // ~0.567 cm per line
-    const initialProtrusion = 2.6; // Top margin in 3D units above front strike horizon
-    const sTop = sArcEnd + initialProtrusion + currentLine * LINE_FEED_3D;
-    const sOffset = initialProtrusion + currentLine * LINE_FEED_3D;
-
     const positionAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
     const uvAttr = geometry.getAttribute("uv") as THREE.BufferAttribute;
-
     let ptr = 0;
-    for (let row = 0; row <= rows; row++) {
-      const v = row / rows; // 0.0 to 1.0
 
-      let y = 0;
-      let z = 0;
-      let uvV = 0;
-
-      if (currentMode === "sheet") {
-        // Single sheet of fixed length: bottom edge drains as top edge advances
+    if (currentMode === "sheet") {
+      const initialProtrusion = 2.6;
+      const sTop = sArcEnd + initialProtrusion + currentLine * LINE_FEED_3D_SHEET;
+      for (let row = 0; row <= rows; row++) {
+        const v = row / rows;
         const s = sTop - v * sheetLength;
-        [y, z] = samplePaperGuidePath(s, pathParams);
-        uvV = 1.0 - v;
-      } else {
-        // Closed loop conveyor ribbon: 3D station sampled around closed track
-        const sStation = v * loopTotalLength;
-        [y, z] = sampleLoopPath(sStation, loopParams);
-        // Dynamic conveyor UV scroll: lines move up front face and cycle over top roller
-        uvV = 1.0 - (sOffset - sStation) / loopTotalLength;
+        const [y, z] = samplePaperGuidePath(s, pathParams);
+        const uvV = 1.0 - v;
+
+        for (let col = 0; col <= cols; col++) {
+          const u = col / cols;
+          const x = (u - 0.5) * paperWidth;
+          positionAttr.setXYZ(ptr, x, y, z);
+          uvAttr.setXY(ptr, u, uvV);
+          ptr++;
+        }
       }
+    } else {
+      // SCROLL MODE: Continuous conveyor ribbon
+      // The strike horizon (sStation = 0) is locked to the active typing line
+      const BASE_TEXT_PHASE = 0.72; // Optical baseline alignment with ribbon vibrator
+      const scrollPhase = (currentLine + BASE_TEXT_PHASE) / SCROLL_LOOP_LINES;
 
-      for (let col = 0; col <= cols; col++) {
-        const u = col / cols;
-        const x = (u - 0.5) * paperWidth;
+      for (let row = 0; row <= rows; row++) {
+        const v = row / rows; // 0.0 to 1.0 around the loop
+        const sStation = v * loopTotalLength;
+        const [y, z] = sampleLoopPath(sStation, loopParams);
 
-        positionAttr.setXYZ(ptr, x, y, z);
-        uvAttr.setXY(ptr, u, uvV);
-        ptr++;
+        // UV coordinate perfectly synchronised with 2D cyclic canvas
+        const uvV = 1.0 - scrollPhase + (sStation / loopTotalLength);
+
+        for (let col = 0; col <= cols; col++) {
+          const u = col / cols;
+          const x = (u - 0.5) * paperWidth;
+          positionAttr.setXYZ(ptr, x, y, z);
+          uvAttr.setXY(ptr, u, uvV);
+          ptr++;
+        }
       }
     }
 
@@ -1137,8 +1148,9 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       const paperWidth = 21.0;
       const cy = PLATEN.y;
       const cz = PLATEN.z;
-      const bailY = PLATEN.y + (PLATEN.r + 0.24) * 0.72;
-      const bailZ = PLATEN.z + (PLATEN.r + 0.24) * 0.78;
+      const bailRadiusOffset = PLATEN.r + 0.36; // 1.9 + 0.36 = 2.26
+      const bailY = PLATEN.y + bailRadiusOffset * 0.72; // ~16.22
+      const bailZ = -1.48; // Clean +Z clearance on the FRONT of the paper
 
       group.position.set(0, bailY, bailZ);
 

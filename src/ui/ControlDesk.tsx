@@ -223,6 +223,32 @@ export function ControlDesk() {
                   ))}
                 </div>
               </div>
+
+              {/* --- Document & Scroll Navigation --- */}
+              <div className="modern-row" style={{ marginTop: "4px" }}>
+                <span className="modern-sublabel">Navigate:</span>
+                <button
+                  className="hud-btn small"
+                  onClick={() => (state.feedMode === "scroll" ? manuscript.scrollLines(-5) : manuscript.prevPage())}
+                  disabled={state.stats.page === 0 && state.stats.line === 0}
+                  title={state.feedMode === "scroll" ? "Roll conveyor up (5 lines)" : "Previous page"}
+                >
+                  ▲ {state.feedMode === "scroll" ? "Roll Up" : "Prev Page"}
+                </button>
+                <button
+                  className="hud-btn small"
+                  onClick={() => (state.feedMode === "scroll" ? manuscript.scrollLines(5) : manuscript.nextPage())}
+                  disabled={state.feedMode === "sheet" && state.stats.page >= state.stats.pages - 1}
+                  title={state.feedMode === "scroll" ? "Roll conveyor down (5 lines)" : "Next page"}
+                >
+                  ▼ {state.feedMode === "scroll" ? "Roll Down" : "Next Page"}
+                </button>
+                <span style={{ fontSize: "10px", color: "var(--bone-dim)", marginLeft: "4px" }}>
+                  {state.feedMode === "scroll"
+                    ? `L${state.stats.page * 44 + state.stats.line + 1}`
+                    : `P${state.stats.page + 1} / ${state.stats.pages}`}
+                </span>
+              </div>
             </div>
           </div>
         </section>

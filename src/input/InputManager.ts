@@ -135,6 +135,24 @@ export class InputManager {
       machine.press("CapsLock");
       return;
     }
+    if (event.code === "PageUp") {
+      event.preventDefault();
+      if (state.feedMode === "scroll") {
+        manuscript.scrollLines(-10);
+      } else {
+        manuscript.prevPage();
+      }
+      return;
+    }
+    if (event.code === "PageDown") {
+      event.preventDefault();
+      if (state.feedMode === "scroll") {
+        manuscript.scrollLines(10);
+      } else {
+        manuscript.nextPage();
+      }
+      return;
+    }
     if (KEY_BY_CODE[event.code]) {
       event.preventDefault();
       machine.press(event.code, { repeat: event.repeat, key: event.key, shiftKey: event.shiftKey });

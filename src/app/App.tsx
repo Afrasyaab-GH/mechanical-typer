@@ -44,6 +44,7 @@ export default function App() {
       useStore.getState().setStats({
         chars: manuscript.charCount,
         words: manuscript.wordCount,
+        page: manuscript.cursor.page,
         pages: manuscript.pages.length,
         line: manuscript.cursor.line,
         col: manuscript.cursor.col,

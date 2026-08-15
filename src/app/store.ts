@@ -6,6 +6,7 @@ export type CameraMode = "write" | "paper" | "mechanism" | "inspect";
 export interface Stats {
   chars: number;
   words: number;
+  page: number;
   pages: number;
   line: number;
   col: number;
@@ -245,7 +246,7 @@ export const useStore = create<AppState>((set, get) => ({
   slowMotion: false,
   setSlowMotion: (slowMotion) => set({ slowMotion }),
 
-  stats: { chars: 0, words: 0, pages: 1, line: 0, col: 0, pageFull: false },
+  stats: { chars: 0, words: 0, page: 0, pages: 1, line: 0, col: 0, pageFull: false },
   setStats: (stats) => set({ stats }),
 
   plaque: null,

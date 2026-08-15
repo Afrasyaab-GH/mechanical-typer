@@ -191,7 +191,6 @@ export class PaperTexture {
     }
 
     if (feedMode === "sheet") {
-      // Standard A4 single page
       const page = Math.min(this.manuscript.cursor.page, this.manuscript.pages.length - 1);
       const rows = this.manuscript.pages[page] ?? [];
       for (const line of rows) {
@@ -200,40 +199,45 @@ export class PaperTexture {
         }
       }
     } else {
-      // Continuous Scroll Mode: ONLY draw lines within the active loop window (e.g. 36 lines)
-      // Older lines are pruned from the canvas texture so returning paper is 100% BLANK
-      const LOOP_CAPACITY = 36; // Maximum lines physically visible on the 3D loop
-      const minVisibleLine = Math.max(0, currentGlobalLine - LOOP_CAPACITY + 2);
-      const lineSpacing = PAPER.TEXT_H / LOOP_CAPACITY;
+      // CONTINUOUS SCROLL MODE:
+      // 48 lines fill the exact 0..1 UV canvas height
+      const SCROLL_LOOP_LINES = 48;
+      const lineSpacing = this.canvas.height / SCROLL_LOOP_LINES;
+      const minVisibleLine = Math.max(0, currentGlobalLine - SCROLL_LOOP_LINES + 3);
 
-      // Collect and flatten only the glyphs in the active visible window [minVisibleLine, currentGlobalLine]
       for (let p = 0; p < this.manuscript.pages.length; p++) {
         const pageRows = this.manuscript.pages[p] ?? [];
         for (let l = 0; l < pageRows.length; l++) {
           const gLine = p * 44 + l;
           if (gLine >= minVisibleLine && gLine <= currentGlobalLine) {
-            // Map gLine cyclically across canvas height without overlapping older text
-            const cyclicLine = gLine % LOOP_CAPACITY;
+            const cyclicLine = ((gLine % SCROLL_LOOP_LINES) + SCROLL_LOOP_LINES) % SCROLL_LOOP_LINES;
             for (const glyph of pageRows[l]) {
-              const cyclicGlyph = { ...glyph, line: cyclicLine };
+              const x = PAPER.MARGIN_X + glyph.col * PAPER.CELL_W + glyph.xJitter * 1.5;
+              const y = cyclicLine * lineSpacing + lineSpacing * 0.72 + glyph.yJitter * 1.5;
 
-              const x = PAPER.MARGIN_X + cyclicGlyph.col * PAPER.CELL_W + cyclicGlyph.xJitter * 1.5;
-              const y =
-                PAPER.MARGIN_TOP +
-                cyclicGlyph.line * lineSpacing +
-                lineSpacing * 0.76 +
-                cyclicGlyph.yJitter * 1.5;
+              const impressions = [...glyph.history, glyph.char];
+              impressions.forEach((char, index) => {
+                const isFinal = index === impressions.length - 1;
+                const opacity = isFinal ? glyph.inkOpacity : Math.min(0.95, glyph.inkOpacity * 0.85);
+                const dx = isFinal ? 0 : (index % 2 === 0 ? 0.9 : -0.8) * (1 + index * 0.4);
+                const dy = isFinal ? 0 : (index % 2 === 0 ? -0.8 : 0.9) * (1 + index * 0.4);
 
-              ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", monospace`;
-              ctx.fillStyle = `rgba(17, 17, 17, ${cyclicGlyph.inkOpacity.toFixed(3)})`;
-              ctx.fillText(cyclicGlyph.char, x, y);
+                ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", monospace`;
+                ctx.textBaseline = "alphabetic";
+                ctx.textAlign = "left";
+
+                ctx.fillStyle = `rgba(17, 17, 17, ${opacity.toFixed(3)})`;
+                ctx.fillText(char, x + dx, y + dy);
+
+                ctx.fillStyle = `rgba(28, 24, 20, ${(opacity * 0.18).toFixed(3)})`;
+                ctx.fillText(char, x + dx + 0.9, y + dy + 0.6);
+              });
             }
           }
         }
       }
     }
 
-    // Immediately signal GPU texture update on exact current frame
     this.texture.needsUpdate = true;
     this.onRepaint?.();
   }

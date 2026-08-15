@@ -330,6 +330,43 @@ export class Manuscript {
     return { accepted: true };
   }
 
+  prevPage(): boolean {
+    if (this.cursor.page > 0) {
+      this.cursor.page--;
+      this.cursor.line = 0;
+      this.cursor.col = LEFT_COL;
+      this.pageFull = false;
+      this.bus.emit("changed", { page: this.cursor.page });
+      this.bus.emit("structure", {});
+      return true;
+    }
+    return false;
+  }
+
+  nextPage(): boolean {
+    if (this.cursor.page < this.pages.length - 1) {
+      this.cursor.page++;
+      this.cursor.line = 0;
+      this.cursor.col = LEFT_COL;
+      this.pageFull = false;
+      this.bus.emit("changed", { page: this.cursor.page });
+      this.bus.emit("structure", {});
+      return true;
+    }
+    return false;
+  }
+
+  scrollLines(delta: number): void {
+    // Moves cursor.line up or down across pages
+    const totalLines = this.pages.length * LINES;
+    let currentGlobal = this.cursor.page * LINES + this.cursor.line;
+    currentGlobal = Math.max(0, Math.min(totalLines - 1, currentGlobal + delta));
+    this.cursor.page = Math.floor(currentGlobal / LINES);
+    this.cursor.line = currentGlobal % LINES;
+    this.bus.emit("changed", { page: this.cursor.page });
+    this.bus.emit("structure", {});
+  }
+
   undo(): boolean {
     const entry = this.undoStack.pop();
     if (!entry) return false;

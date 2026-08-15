@@ -31,13 +31,14 @@ function lerpPose(from: Pose, to: Pose, t: number): Pose {
   };
 }
 
-/** Stretch a plane ribbon segment between two points with vertical normal. */
+/** Stretch a plane ribbon segment between two points. */
 function layRibbonSegment(mesh: THREE.Mesh, from: THREE.Vector3, to: THREE.Vector3): void {
   const direction = to.clone().sub(from);
   const length = direction.length();
   mesh.position.copy(from).addScaledVector(direction, 0.5);
   mesh.scale.set(length, 1, 1);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.clone().normalize());
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize());
+  mesh.rotateX(Math.PI / 2);
 }
 
 export function Machine() {
@@ -191,17 +192,13 @@ export function Machine() {
     build.refs.returnLeverAction.rotation.x = machine.returnLeverPull * 0.55;
     build.refs.bellAction.scale.setScalar(1 + machine.bellFlash * 0.08);
 
-    // --- Ribbon path (3-segment threaded ink ribbon) ---
+    // --- Ribbon path ---
     const tipL = build.refs.ribbonTipL;
     const tipR = build.refs.ribbonTipR;
-    tipL.set(-0.9, 13.2 + lift * 0.65, -1.48);
-    tipR.set(0.9, 13.2 + lift * 0.65, -1.48);
-    const spoolGuideL = new THREE.Vector3(-7.2, 13.2, -1.35);
-    const spoolGuideR = new THREE.Vector3(7.2, 13.2, -1.35);
-
-    layRibbonSegment(build.refs.ribbonSideL, spoolGuideL, tipL);
-    layRibbonSegment(build.refs.ribbonCenter, tipL, tipR);
-    layRibbonSegment(build.refs.ribbonSideR, tipR, spoolGuideR);
+    tipL.set(-0.8, 13.0 + lift * 0.65, -1.52 - lift * 0.12);
+    tipR.set(0.8, 13.0 + lift * 0.65, -1.52 - lift * 0.12);
+    layRibbonSegment(build.refs.ribbonSideL, new THREE.Vector3(-6.1, 13.0, -1.45), tipL);
+    layRibbonSegment(build.refs.ribbonSideR, tipR, new THREE.Vector3(6.1, 13.0, -1.45));
 
     // --- Upper return guide visibility toggle according to feedMode ---
     if (build.refs.topGuide) {

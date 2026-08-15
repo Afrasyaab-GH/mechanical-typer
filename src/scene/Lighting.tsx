@@ -37,34 +37,33 @@ export function Lighting() {
       {reflectionsEnabled && effectiveReflection > 0 && (
         <Environment preset="city" environmentIntensity={effectiveReflection} />
       )}
-      <ambientLight intensity={0.4 * effectiveStudio} color={0x52483d} />
+      <ambientLight intensity={0.25 * effectiveStudio} color={0x52483d} />
 
       {/* Desk Lamp Focused Key Spotlight */}
       <spotLight
         ref={keySpot}
         position={[-14.8, 24.9, 2.5]}
         angle={0.72}
-        penumbra={0.6}
-        intensity={5200 * effectiveDeskLamp}
+        penumbra={0.5}
+        intensity={160 * effectiveDeskLamp}
         color={deskLampWarmth}
         castShadow
         shadow-mapSize={[1024, 1024]}
-        shadow-bias={-0.0004}
+        shadow-bias={-0.0002}
         target-position={[0, 10, 0]}
       />
-      <pointLight position={[-14.8, 24.9, 2.5]} intensity={45 * effectiveDeskLamp} color={deskLampWarmth} />
+      <pointLight position={[-14.8, 24.9, 2.5]} intensity={12 * effectiveDeskLamp} color={deskLampWarmth} />
 
       {/* Studio Fill Lighting */}
       <spotLight
         position={[26, 17, 32]}
         angle={0.9}
-        penumbra={0.9}
-        intensity={1200 * effectiveStudio}
+        penumbra={0.8}
+        intensity={45 * effectiveStudio}
         color={lightWarmth}
         target-position={[0, 9, 0]}
       />
-      <directionalLight position={[18, 16, -26]} intensity={0.85 * effectiveStudio} color={0xa9bed8} />
-      <pointLight position={[0, 26, 30]} intensity={65 * effectiveStudio} color={0x40382c} />
+      <directionalLight position={[18, 16, -26]} intensity={0.4 * effectiveStudio} color={0xa9bed8} />
     </group>
   );
 }

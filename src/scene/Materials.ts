@@ -82,7 +82,7 @@ function buildEnamelNormalMap(size = 512): THREE.CanvasTexture {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(2, 2);
+  texture.repeat.set(16, 16);
   texture.colorSpace = THREE.NoColorSpace;
   return texture;
 }
@@ -126,7 +126,7 @@ function buildEnamelRoughnessMap(size = 512): THREE.CanvasTexture {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(2, 2);
+  texture.repeat.set(12, 12);
   texture.colorSpace = THREE.NoColorSpace;
   return texture;
 }
@@ -175,7 +175,7 @@ function buildCastIronNormalMap(size = 512): THREE.CanvasTexture {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(3, 3);
+  texture.repeat.set(18, 18);
   texture.colorSpace = THREE.NoColorSpace;
   return texture;
 }
@@ -204,54 +204,8 @@ function buildWoodTexture(): THREE.CanvasTexture {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(3, 2);
+  texture.repeat.set(6, 4);
   texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-/**
- * Procedural woven cotton/silk ink-ribbon fabric normal map.
- * Generates an authentic micro-woven crosshatch weave pattern.
- */
-function buildRibbonNormalMap(size = 256): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-
-  ctx.fillStyle = "rgb(128,128,255)";
-  ctx.fillRect(0, 0, size, size);
-
-  const imgData = ctx.getImageData(0, 0, size, size);
-  const data = imgData.data;
-
-  // Interlaced plain-weave warp & weft micro-threads (approx 32 threads across)
-  const threadWidth = 8;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const warp = Math.floor(x / threadWidth) % 2;
-      const weft = Math.floor(y / threadWidth) % 2;
-      const isOver = warp === weft;
-
-      const lx = (x % threadWidth) / threadWidth - 0.5;
-      const ly = (y % threadWidth) / threadWidth - 0.5;
-
-      const nx = isOver ? Math.sin(lx * Math.PI) * 45 : (Math.random() - 0.5) * 12;
-      const ny = !isOver ? Math.sin(ly * Math.PI) * 45 : (Math.random() - 0.5) * 12;
-
-      const idx = (y * size + x) * 4;
-      data[idx] = Math.min(255, Math.max(0, 128 + Math.round(nx)));
-      data[idx + 1] = Math.min(255, Math.max(0, 128 + Math.round(ny)));
-      data[idx + 2] = 255;
-    }
-  }
-
-  ctx.putImageData(imgData, 0, 0);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(12, 3);
-  texture.colorSpace = THREE.NoColorSpace;
   return texture;
 }
 
@@ -262,7 +216,6 @@ function buildRibbonNormalMap(size = 256): THREE.CanvasTexture {
 let _enamelNormal: THREE.CanvasTexture | null = null;
 let _enamelRoughness: THREE.CanvasTexture | null = null;
 let _castIronNormal: THREE.CanvasTexture | null = null;
-let _ribbonNormal: THREE.CanvasTexture | null = null;
 
 function getEnamelNormal(): THREE.CanvasTexture {
   if (!_enamelNormal) _enamelNormal = buildEnamelNormalMap();
@@ -276,10 +229,6 @@ function getCastIronNormal(): THREE.CanvasTexture {
   if (!_castIronNormal) _castIronNormal = buildCastIronNormalMap();
   return _castIronNormal;
 }
-function getRibbonNormal(): THREE.CanvasTexture {
-  if (!_ribbonNormal) _ribbonNormal = buildRibbonNormalMap();
-  return _ribbonNormal;
-}
 
 /* ------------------------------------------------------------------ */
 /* Material interfaces & builder                                       */
@@ -288,7 +237,7 @@ function getRibbonNormal(): THREE.CanvasTexture {
 export interface MachineMaterials {
   enamel: THREE.MeshPhysicalMaterial;
   enamelPanel: THREE.MeshPhysicalMaterial;
-  castIron: THREE.MeshPhysicalMaterial;
+  castIron: THREE.MeshStandardMaterial;
   nickel: THREE.MeshStandardMaterial;
   steelDark: THREE.MeshStandardMaterial;
   brass: THREE.MeshStandardMaterial;
@@ -305,97 +254,74 @@ export interface MachineMaterials {
 export function buildMaterials(theme: MachineTheme = "midnight"): MachineMaterials {
   const colors = THEME_COLORS[theme] ?? THEME_COLORS.midnight;
 
-  const enamelNormal = getEnamelNormal();
-  const enamelRoughMap = getEnamelRoughness();
-  const ironNormal = getCastIronNormal();
-
   return {
     enamel: new THREE.MeshPhysicalMaterial({
       color: colors.main,
-      roughness: 0.25,
-      metalness: 0.05,
-      clearcoat: 0.0,
-      clearcoatRoughness: 0.1,
-      reflectivity: 0.0,
-      envMapIntensity: 0.0,
-      normalMap: enamelNormal,
-      normalScale: new THREE.Vector2(0.15, 0.15),
-      roughnessMap: enamelRoughMap,
-      sheen: 0.08,
-      sheenRoughness: 0.4,
-      sheenColor: new THREE.Color(0x333333),
+      roughness: 0.42,
+      metalness: 0.08,
+      clearcoat: 0.15,
+      clearcoatRoughness: 0.25,
+      normalMap: getEnamelNormal(),
+      normalScale: new THREE.Vector2(0.35, 0.35),
+      roughnessMap: getEnamelRoughness(),
     }),
     enamelPanel: new THREE.MeshPhysicalMaterial({
       color: colors.panel,
-      roughness: 0.28,
-      metalness: 0.05,
-      clearcoat: 0.0,
-      clearcoatRoughness: 0.1,
-      reflectivity: 0.0,
-      envMapIntensity: 0.0,
-      normalMap: enamelNormal,
-      normalScale: new THREE.Vector2(0.12, 0.12),
-      roughnessMap: enamelRoughMap,
-      sheen: 0.06,
-      sheenRoughness: 0.45,
-      sheenColor: new THREE.Color(0x2a2a2a),
-    }),
-    castIron: new THREE.MeshPhysicalMaterial({
-      color: 0x1a1a1c,
-      roughness: 0.55,
-      metalness: 0.35,
-      clearcoat: 0.0,
-      clearcoatRoughness: 0.5,
-      reflectivity: 0.0,
-      envMapIntensity: 0.0,
-      normalMap: ironNormal,
+      roughness: 0.45,
+      metalness: 0.08,
+      clearcoat: 0.12,
+      clearcoatRoughness: 0.3,
+      normalMap: getEnamelNormal(),
       normalScale: new THREE.Vector2(0.3, 0.3),
-      sheen: 0.0,
-      sheenRoughness: 0.8,
-      sheenColor: new THREE.Color(0x111111),
+      roughnessMap: getEnamelRoughness(),
+    }),
+    castIron: new THREE.MeshStandardMaterial({
+      color: 0x1c1b1a,
+      roughness: 0.72,
+      metalness: 0.25,
+      normalMap: getCastIronNormal(),
+      normalScale: new THREE.Vector2(0.6, 0.6),
     }),
     nickel: new THREE.MeshStandardMaterial({
-      color: 0xf0f0f0,
-      roughness: 0.12,
-      metalness: 0.95,
+      color: 0xd8d8d8,
+      roughness: 0.32,
+      metalness: 0.88,
     }),
     steelDark: new THREE.MeshStandardMaterial({
-      color: 0xe8e8e8,
-      roughness: 0.15,
-      metalness: 0.95,
+      color: 0x5a5a5c,
+      roughness: 0.45,
+      metalness: 0.82,
     }),
     brass: new THREE.MeshStandardMaterial({
-      color: 0xc5a059,
-      roughness: 0.22,
-      metalness: 0.88,
+      color: 0xb89248,
+      roughness: 0.38,
+      metalness: 0.82,
     }),
     keyRim: new THREE.MeshStandardMaterial({
       color: 0x222222,
-      roughness: 0.3,
-      metalness: 0.7,
+      roughness: 0.38,
+      metalness: 0.75,
     }),
     keyTop: new THREE.MeshStandardMaterial({
       color: 0xe9e0c8,
-      roughness: 0.2,
+      roughness: 0.28,
       metalness: 0.05,
     }),
     rubber: new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      roughness: 0.92,
-      metalness: 0.02,
+      color: 0x181818,
+      roughness: 0.94,
+      metalness: 0.0,
     }),
     ribbon: new THREE.MeshStandardMaterial({
-      color: 0x111014,
-      roughness: 0.82,
-      metalness: 0.04,
-      normalMap: getRibbonNormal(),
-      normalScale: new THREE.Vector2(0.35, 0.35),
+      color: 0x121014,
+      roughness: 0.9,
+      metalness: 0.0,
       side: THREE.DoubleSide,
     }),
     bellMetal: new THREE.MeshStandardMaterial({
-      color: 0xc5a059,
-      roughness: 0.22,
-      metalness: 0.88,
+      color: 0xb89248,
+      roughness: 0.38,
+      metalness: 0.82,
     }),
     wood: new THREE.MeshStandardMaterial({
       map: buildWoodTexture(),
@@ -429,74 +355,69 @@ export function applyReflectionSettings(
   intensity: number
 ): void {
   const isReflective = enabled && intensity > 0.001;
-  const coat = isReflective ? Math.min(1.0, 0.7 * intensity) : 0.0;
-  const refl = isReflective ? Math.min(1.0, 0.8 * intensity) : 0.0;
+  const coat = isReflective ? Math.min(1.0, 0.4 * intensity) : 0.0;
+  const refl = isReflective ? Math.min(1.0, 0.5 * intensity) : 0.0;
   const env = isReflective ? intensity : 0.0;
 
   // Enamel body chassis and panels
-  materials.enamel.clearcoat = coat;
-  materials.enamel.clearcoatRoughness = isReflective ? 0.06 : 0.6;
+  materials.enamel.clearcoat = isReflective ? 0.15 + coat * 0.35 : 0.0;
+  materials.enamel.clearcoatRoughness = isReflective ? 0.15 : 0.5;
   materials.enamel.reflectivity = refl;
   materials.enamel.envMapIntensity = env;
-  materials.enamel.roughness = isReflective ? 0.15 : 0.35;
-  materials.enamel.metalness = isReflective ? 0.1 : 0.02;
-  materials.enamel.normalScale.set(isReflective ? 0.12 : 0.18, isReflective ? 0.12 : 0.18);
-  materials.enamel.sheen = isReflective ? 0.03 : 0.08;
+  materials.enamel.roughness = isReflective ? 0.32 : 0.42;
+  materials.enamel.metalness = isReflective ? 0.08 : 0.08;
+  materials.enamel.normalScale.set(0.35, 0.35);
   materials.enamel.needsUpdate = true;
 
-  materials.enamelPanel.clearcoat = coat;
-  materials.enamelPanel.clearcoatRoughness = isReflective ? 0.06 : 0.6;
+  materials.enamelPanel.clearcoat = isReflective ? 0.12 + coat * 0.3 : 0.0;
+  materials.enamelPanel.clearcoatRoughness = isReflective ? 0.18 : 0.5;
   materials.enamelPanel.reflectivity = refl;
   materials.enamelPanel.envMapIntensity = env;
-  materials.enamelPanel.roughness = isReflective ? 0.18 : 0.38;
-  materials.enamelPanel.metalness = isReflective ? 0.1 : 0.02;
-  materials.enamelPanel.normalScale.set(isReflective ? 0.1 : 0.15, isReflective ? 0.1 : 0.15);
-  materials.enamelPanel.sheen = isReflective ? 0.02 : 0.06;
+  materials.enamelPanel.roughness = isReflective ? 0.35 : 0.45;
+  materials.enamelPanel.metalness = isReflective ? 0.08 : 0.08;
+  materials.enamelPanel.normalScale.set(0.3, 0.3);
   materials.enamelPanel.needsUpdate = true;
 
   // Cast iron chassis base
   if (materials.castIron) {
-    materials.castIron.clearcoat = isReflective ? coat * 0.3 : 0.0;
-    materials.castIron.clearcoatRoughness = 0.4;
-    materials.castIron.reflectivity = isReflective ? refl * 0.3 : 0.0;
-    materials.castIron.envMapIntensity = isReflective ? env * 0.4 : 0.0;
-    materials.castIron.roughness = isReflective ? 0.45 : 0.6;
-    materials.castIron.metalness = isReflective ? 0.4 : 0.3;
+    materials.castIron.envMapIntensity = isReflective ? env * 0.3 : 0.0;
+    materials.castIron.roughness = isReflective ? 0.65 : 0.72;
+    materials.castIron.metalness = isReflective ? 0.3 : 0.25;
     materials.castIron.needsUpdate = true;
   }
 
   // Nickel, steel, brass, and mechanical metals
   materials.nickel.envMapIntensity = env;
-  materials.nickel.roughness = isReflective ? 0.12 : 0.45;
-  materials.nickel.metalness = isReflective ? 0.95 : 0.7;
+  materials.nickel.roughness = isReflective ? 0.24 : 0.32;
+  materials.nickel.metalness = isReflective ? 0.92 : 0.88;
   materials.nickel.needsUpdate = true;
 
   materials.steelDark.envMapIntensity = env;
-  materials.steelDark.roughness = isReflective ? 0.15 : 0.5;
-  materials.steelDark.metalness = isReflective ? 0.95 : 0.7;
+  materials.steelDark.roughness = isReflective ? 0.35 : 0.45;
+  materials.steelDark.metalness = isReflective ? 0.88 : 0.82;
   materials.steelDark.needsUpdate = true;
 
   materials.brass.envMapIntensity = env;
-  materials.brass.roughness = isReflective ? 0.22 : 0.5;
-  materials.brass.metalness = isReflective ? 0.88 : 0.6;
+  materials.brass.roughness = isReflective ? 0.30 : 0.38;
+  materials.brass.metalness = isReflective ? 0.88 : 0.82;
   materials.brass.needsUpdate = true;
 
   materials.bellMetal.envMapIntensity = env;
-  materials.bellMetal.roughness = isReflective ? 0.22 : 0.5;
-  materials.bellMetal.metalness = isReflective ? 0.88 : 0.6;
+  materials.bellMetal.roughness = isReflective ? 0.30 : 0.38;
+  materials.bellMetal.metalness = isReflective ? 0.88 : 0.82;
   materials.bellMetal.needsUpdate = true;
 
-  materials.keyRim.envMapIntensity = isReflective ? env * 0.7 : 0.0;
-  materials.keyRim.roughness = isReflective ? 0.3 : 0.6;
-  materials.keyRim.metalness = isReflective ? 0.7 : 0.3;
+  materials.keyRim.envMapIntensity = isReflective ? env * 0.5 : 0.0;
+  materials.keyRim.roughness = isReflective ? 0.32 : 0.38;
+  materials.keyRim.metalness = isReflective ? 0.75 : 0.75;
   materials.keyRim.needsUpdate = true;
 
-  materials.keyTop.envMapIntensity = isReflective ? env * 0.3 : 0.0;
-  materials.keyTop.roughness = isReflective ? 0.2 : 0.6;
+  materials.keyTop.envMapIntensity = isReflective ? env * 0.2 : 0.0;
+  materials.keyTop.roughness = isReflective ? 0.24 : 0.28;
   materials.keyTop.needsUpdate = true;
 
-  materials.wood.envMapIntensity = isReflective ? env * 0.2 : 0.0;
-  materials.wood.roughness = isReflective ? 0.75 : 0.92;
+  materials.wood.envMapIntensity = isReflective ? env * 0.15 : 0.0;
+  materials.wood.roughness = isReflective ? 0.72 : 0.75;
   materials.wood.needsUpdate = true;
 }
 

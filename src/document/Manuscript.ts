@@ -286,6 +286,23 @@ export class Manuscript {
       this.undoStack.push({ kind: "cursor", cursorBefore, cursorAfter: { ...this.cursor } });
       this.redoStack.length = 0;
       this.bus.emit("changed", { page });
+      this.bus.emit("structure", {});
+      return { accepted: true };
+    } else if (this.cursor.col <= LEFT_COL && this.cursor.line === 0 && this.cursor.page > 0) {
+      const cursorBefore = { ...this.cursor };
+      this.cursor.page--;
+      this.cursor.line = LINES - 1;
+      const prevRow = this.pages[this.cursor.page]?.[this.cursor.line] ?? [];
+      if (prevRow.length > 0) {
+        const lastGlyph = prevRow[prevRow.length - 1];
+        this.cursor.col = Math.min(RIGHT_MARGIN, lastGlyph.col + 1);
+      } else {
+        this.cursor.col = LEFT_COL;
+      }
+      this.undoStack.push({ kind: "cursor", cursorBefore, cursorAfter: { ...this.cursor } });
+      this.redoStack.length = 0;
+      this.bus.emit("changed", { page: this.cursor.page });
+      this.bus.emit("structure", {});
       return { accepted: true };
     }
 

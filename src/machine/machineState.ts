@@ -144,7 +144,7 @@ export class MachineState {
   }
 
   press(code: string, options: PressOptions = {}): boolean {
-    if (options.repeat) return false;
+    if (options.repeat && code !== "Backspace") return false;
     if (code === "CapsLock") {
       if (this.canType) {
         this.capsLock = !this.capsLock;
@@ -166,8 +166,29 @@ export class MachineState {
         return true;
       case "space":
         return this.enqueue({ code, kind: "space", char: null, typebar: -1, viaUnicodeAdapter: false });
-      case "backspace":
-        return this.enqueue({ code, kind: "backspace", char: null, typebar: -1, viaUnicodeAdapter: false });
+      case "backspace": {
+        const result = this.manuscript.apply({ type: "BACKSPACE", timestamp: this.now });
+        if (result.accepted) {
+          this.releaseEscapement(-1);
+          this.bus.emit("keyTravel", { code, kind: "backspace" });
+          this.actors.push({
+            id: this.actorId++,
+            code,
+            kind: "backspace",
+            char: null,
+            typebar: -1,
+            start: this.now,
+            impacted: true,
+            applied: true,
+            linked: true,
+            escaped: true,
+            rested: false,
+            clashDelayed: false,
+            viaUnicodeAdapter: false,
+          });
+        }
+        return result.accepted;
+      }
       case "tab":
         return this.enqueue({ code, kind: "tab", char: null, typebar: -1, viaUnicodeAdapter: false });
       case "char": {
@@ -456,9 +477,6 @@ export class MachineState {
         if (actor.applied) this.releaseEscapement(1);
         break;
       case "backspace":
-        if (this.manuscript.apply({ type: "BACKSPACE", timestamp: this.now }).accepted) {
-          this.releaseEscapement(-1);
-        }
         break;
       case "tab": {
         const before = this.manuscript.cursor.col;
@@ -475,9 +493,9 @@ export class MachineState {
     this.bus.emit("escapement", { kind: teeth > 0 ? "char" : "backspace" });
     this.escapeWheelTarget += teeth * 0.35;
     const from = this.carriageCols;
-    const to = Math.max(LEFT_COL, Math.min(RIGHT_MARGIN, this.carriageTarget + teeth));
+    const to = Math.max(LEFT_COL, Math.min(RIGHT_MARGIN, this.manuscript.cursor.col));
     this.carriageTarget = to;
-    this.carriageAnim = { from, to, start: this.now, dur: 110 };
+    this.carriageAnim = { from, to, start: this.now, dur: 90 };
     if (teeth > 0) {
       this.ribbonAngle += RIBBON_STEP * this.ribbonDirection;
       this.ribbonCharsSinceReverse++;

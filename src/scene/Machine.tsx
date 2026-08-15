@@ -31,14 +31,13 @@ function lerpPose(from: Pose, to: Pose, t: number): Pose {
   };
 }
 
-/** Stretch a plane ribbon segment between two points. */
+/** Stretch a plane ribbon segment between two points standing vertically on the Y axis. */
 function layRibbonSegment(mesh: THREE.Mesh, from: THREE.Vector3, to: THREE.Vector3): void {
   const direction = to.clone().sub(from);
   const length = direction.length();
   mesh.position.copy(from).addScaledVector(direction, 0.5);
   mesh.scale.set(length, 1, 1);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize());
-  mesh.rotateX(Math.PI / 2);
 }
 
 export function Machine() {

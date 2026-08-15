@@ -53,7 +53,7 @@ export class MechanicalAudio {
   private noiseBuffer: AudioBuffer | null = null;
   private variant = 0;
   private activeVoices = 0;
-  private maxVoices = 10;
+  private maxVoices = 32;
   private lastPlay = new Map<string, number>();
 
   /** Create or resume the AudioContext after user interaction. */
@@ -65,7 +65,7 @@ export class MechanicalAudio {
     try {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) return;
-      this.ctx = new Ctor();
+      this.ctx = new Ctor({ latencyHint: "interactive" });
       this.master = this.ctx.createGain();
       this.master.gain.value = this.enabled ? this.volume : 0;
       this.master.connect(this.ctx.destination);
@@ -150,7 +150,7 @@ export class MechanicalAudio {
 
   private track(): void {
     this.activeVoices++;
-    window.setTimeout(() => this.activeVoices--, 250);
+    window.setTimeout(() => this.activeVoices--, 100);
   }
 
   play(event: SoundEvent, intensity = 1): void {
@@ -159,42 +159,50 @@ export class MechanicalAudio {
     const variantScale = 1 + (this.nextVariant() - 2.5) * 0.018;
     switch (event) {
       case "keyDown":
-        if (this.throttled(event, 18)) return;
-        this.noise({ dur: 0.03, gain: 0.12 * level, type: "lowpass", freq: 900 * variantScale });
-        this.tone({ freq: 140 * variantScale, dur: 0.04, gain: 0.05 * level, type: "sine" });
+        if (this.throttled(event, 8)) return;
+        // Crisp tactile mechanical click transient (instant switch strike)
+        this.noise({ dur: 0.014, gain: 0.28 * level, type: "bandpass", freq: 3800 * variantScale, q: 2.5 });
+        // Keycap bottoming thud
+        this.noise({ dur: 0.02, gain: 0.2 * level, type: "lowpass", freq: 1200 * variantScale });
+        this.tone({ freq: 180 * variantScale, freqEnd: 100, dur: 0.025, gain: 0.08 * level, type: "triangle" });
         break;
       case "linkage":
-        if (this.throttled(event, 20)) return;
-        this.noise({ dur: 0.014, gain: 0.06 * level, type: "bandpass", freq: 3400 * variantScale, q: 3 });
+        if (this.throttled(event, 10)) return;
+        this.noise({ dur: 0.012, gain: 0.06 * level, type: "bandpass", freq: 3400 * variantScale, q: 3 });
         break;
       case "swish":
-        if (this.throttled(event, 25)) return;
-        this.noise({ dur: 0.05, gain: 0.05 * level, type: "bandpass", freq: 1500 * variantScale, q: 1.4 });
+        if (this.throttled(event, 15)) return;
+        this.noise({ dur: 0.03, gain: 0.05 * level, type: "bandpass", freq: 1500 * variantScale, q: 1.4 });
         break;
       case "impact":
-        if (this.throttled(event, 25)) return;
-        this.noise({ dur: 0.05, gain: 0.5 * level, type: "lowpass", freq: 2600 * variantScale, decay: 0.045 });
-        this.tone({ freq: 210 * variantScale, freqEnd: 90, dur: 0.07, gain: 0.3 * level, type: "triangle", decay: 0.06 });
-        this.noise({ dur: 0.012, gain: 0.28 * level, type: "highpass", freq: 3800 * variantScale });
+        if (this.throttled(event, 10)) return;
+        // Solid platen strike hammer crack
+        this.noise({ dur: 0.035, gain: 0.65 * level, type: "lowpass", freq: 2800 * variantScale, decay: 0.03 });
+        // Resonant cast-iron body thud
+        this.tone({ freq: 240 * variantScale, freqEnd: 85, dur: 0.05, gain: 0.35 * level, type: "triangle", decay: 0.045 });
+        // Crisp paper punch transient
+        this.noise({ dur: 0.01, gain: 0.42 * level, type: "highpass", freq: 4200 * variantScale });
         break;
       case "rest":
-        if (this.throttled(event, 25)) return;
-        this.noise({ dur: 0.025, gain: 0.09 * level, type: "lowpass", freq: 700 * variantScale });
+        if (this.throttled(event, 10)) return;
+        this.noise({ dur: 0.02, gain: 0.08 * level, type: "lowpass", freq: 650 * variantScale });
         break;
       case "escapement":
-        if (this.throttled(event, 25)) return;
-        this.noise({ dur: 0.02, gain: 0.14 * level, type: "bandpass", freq: 2600 * variantScale, q: 4 });
-        this.tone({ freq: 1900 * variantScale, dur: 0.02, gain: 0.04 * level, type: "square", decay: 0.018 });
+        if (this.throttled(event, 10)) return;
+        this.noise({ dur: 0.015, gain: 0.16 * level, type: "bandpass", freq: 2800 * variantScale, q: 4 });
+        this.tone({ freq: 2100 * variantScale, dur: 0.015, gain: 0.05 * level, type: "square", decay: 0.012 });
         break;
       case "space":
-        if (this.throttled(event, 30)) return;
-        this.noise({ dur: 0.05, gain: 0.3 * level, type: "lowpass", freq: 500 * variantScale });
-        this.tone({ freq: 95 * variantScale, dur: 0.06, gain: 0.16 * level, type: "sine" });
+        if (this.throttled(event, 10)) return;
+        this.noise({ dur: 0.035, gain: 0.38 * level, type: "lowpass", freq: 600 * variantScale });
+        this.noise({ dur: 0.015, gain: 0.22 * level, type: "bandpass", freq: 2600 * variantScale, q: 2.8 });
+        this.tone({ freq: 105 * variantScale, dur: 0.045, gain: 0.2 * level, type: "sine" });
         break;
       case "backspace":
-        if (this.throttled(event, 30)) return;
-        this.noise({ dur: 0.04, gain: 0.22 * level, type: "lowpass", freq: 750 * variantScale });
-        this.noise({ at: 0.03, dur: 0.02, gain: 0.12 * level, type: "bandpass", freq: 2200 * variantScale, q: 4 });
+        if (this.throttled(event, 10)) return;
+        this.noise({ dur: 0.03, gain: 0.26 * level, type: "lowpass", freq: 800 * variantScale });
+        this.noise({ dur: 0.02, gain: 0.2 * level, type: "bandpass", freq: 3000 * variantScale, q: 3.5 });
+        this.tone({ freq: 420 * variantScale, freqEnd: 200, dur: 0.035, gain: 0.12 * level, type: "sawtooth" });
         break;
       case "bell": {
         const base = 2080 * variantScale;

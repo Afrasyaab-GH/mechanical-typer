@@ -399,8 +399,8 @@ export class MachineState {
         if (actor.typebar >= 0) this.bus.emit("typebarRest", { code: actor.code, typebar: actor.typebar });
       }
     }
-    if (this.actors.length > 64 || (this.actors.length > 0 && this.actors[0].rested)) {
-      this.actors = this.actors.filter((a) => !a.rested || this.now - a.start < TYPEBAR_CYCLE_MS + 400);
+    if (this.actors.length > 32 || (this.actors.length > 0 && this.actors[0].rested)) {
+      this.actors = this.actors.filter((a) => !a.rested || this.now - a.start < TYPEBAR_CYCLE_MS + 100);
     }
 
     // --- Basket shift easing (~120ms) ---
@@ -500,7 +500,7 @@ export class MachineState {
     const from = this.carriageCols;
     const to = Math.max(LEFT_COL, Math.min(this.manuscript.rightMargin, this.manuscript.cursor.col));
     this.carriageTarget = to;
-    this.carriageAnim = { from, to, start: this.now, dur: 90 };
+    this.carriageAnim = { from, to, start: this.now, dur: 55 };
     if (teeth > 0) {
       this.ribbonAngle += RIBBON_STEP * this.ribbonDirection;
       this.ribbonCharsSinceReverse++;
@@ -511,7 +511,7 @@ export class MachineState {
     }
   }
 
-  /** Keycap depression curve: 0–35ms down, held to 115ms, returned by 210ms. */
+  /** Keycap depression curve: 0–18ms down, held to 55ms, returned by 105ms. */
   keyDip(code: string): number {
     let dip = 0;
     for (const actor of this.actors) {
@@ -519,42 +519,43 @@ export class MachineState {
       const elapsed = this.now - actor.start;
       if (elapsed < 0) continue;
       let value: number;
-      if (elapsed < 35) value = easeOutQuad(elapsed / 35);
-      else if (elapsed < 115) value = 1;
-      else if (elapsed < 210) value = 1 - easeInOutQuad((elapsed - 115) / 95);
+      if (elapsed < 18) value = easeOutQuad(elapsed / 18);
+      else if (elapsed < 55) value = 1;
+      else if (elapsed < 105) value = 1 - easeInOutQuad((elapsed - 55) / 50);
       else value = 0;
       dip = Math.max(dip, value);
     }
     return dip;
   }
 
-  /** Typebar swing: rises 20–100ms, contacts 100–115ms, returns by 210ms. */
+  /** Typebar swing: instant rise 0–45ms, contacts 45–55ms, snappy return by 110ms. */
   typebarSwing(typebar: number): number {
     let swing = 0;
     for (const actor of this.actors) {
       if (actor.typebar !== typebar) continue;
       const elapsed = this.now - actor.start;
-      if (elapsed < 20) continue;
+      if (elapsed < 0) continue;
       let value: number;
-      if (elapsed < 100) value = easeInQuad((elapsed - 20) / 80) * 1.08;
-      else if (elapsed < 115) value = 1.08 - 0.08 * easeOutQuad((elapsed - 100) / 15);
-      else if (elapsed < 210) value = 1 - easeInOutQuad((elapsed - 115) / 95);
+      if (elapsed < 45) value = easeInQuad(elapsed / 45) * 1.05;
+      else if (elapsed < 55) value = 1.05 - 0.05 * easeOutQuad((elapsed - 45) / 10);
+      else if (elapsed < 110) value = 1 - easeInOutQuad((elapsed - 55) / 55);
       else value = 0;
       swing = Math.max(swing, value);
     }
     return swing;
   }
 
-  /** Ribbon vibrator lift: starts 55ms, holds 100–130ms, drops by 175ms. */
+  /** Ribbon vibrator lift: rises 0–30ms, holds 30–60ms, drops by 95ms. */
   vibratorLift(): number {
     let lift = 0;
     for (const actor of this.actors) {
       if (actor.typebar < 0) continue;
       const elapsed = this.now - actor.start;
+      if (elapsed < 0) continue;
       let value = 0;
-      if (elapsed >= 55 && elapsed < 100) value = easeOutQuad((elapsed - 55) / 45);
-      else if (elapsed >= 100 && elapsed < 130) value = 1;
-      else if (elapsed >= 130 && elapsed < 175) value = 1 - easeInQuad((elapsed - 130) / 45);
+      if (elapsed < 30) value = easeOutQuad(elapsed / 30);
+      else if (elapsed < 60) value = 1;
+      else if (elapsed < 95) value = 1 - easeInQuad((elapsed - 60) / 35);
       lift = Math.max(lift, value);
     }
     return lift;
@@ -564,7 +565,7 @@ export class MachineState {
     let dip = 0;
     for (const actor of this.actors) {
       const elapsed = this.now - actor.start;
-      if (elapsed >= 30 && elapsed < 120) dip = 1;
+      if (elapsed >= 10 && elapsed < 65) dip = 1;
     }
     return dip;
   }

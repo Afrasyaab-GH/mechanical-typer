@@ -209,6 +209,146 @@ function buildWoodTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+/**
+ * Procedural slotted machine screw cap diffuse texture.
+ * Generates a polished radial brushed face with an authentic dark screwdriver slot.
+ */
+function buildScrewTexture(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const center = size / 2;
+
+  // Background radial metallic sheen
+  const grad = ctx.createRadialGradient(center, center, size * 0.05, center, center, size * 0.48);
+  grad.addColorStop(0.0, "#ffffff");
+  grad.addColorStop(0.2, "#e8e8ea");
+  grad.addColorStop(0.55, "#cccccc");
+  grad.addColorStop(0.85, "#a0a0a4");
+  grad.addColorStop(1.0, "#606064");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Concentric lathe circular machining marks
+  ctx.save();
+  const rand = makePRNG(137);
+  for (let r = 8; r < center; r += 3) {
+    const alpha = 0.04 + rand() * 0.08;
+    ctx.strokeStyle = rand() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+    ctx.lineWidth = 1 + rand() * 1.5;
+    ctx.beginPath();
+    ctx.arc(center, center, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Outer chamfer bevel ring
+  ctx.strokeStyle = "rgba(40, 40, 45, 0.6)";
+  ctx.lineWidth = size * 0.035;
+  ctx.beginPath();
+  ctx.arc(center, center, size * 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Outer highlight rim
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+  ctx.lineWidth = size * 0.02;
+  ctx.beginPath();
+  ctx.arc(center, center, size * 0.43, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Screwdriver slot (deep centered rectangular groove)
+  const slotW = size * 0.68;
+  const slotH = size * 0.125;
+  const slotX = center - slotW / 2;
+  const slotY = center - slotH / 2;
+
+  // Outer groove shadow & bevel
+  ctx.fillStyle = "#111113";
+  ctx.fillRect(slotX, slotY, slotW, slotH);
+
+  // Deep groove floor
+  ctx.fillStyle = "#050506";
+  ctx.fillRect(slotX + 2, slotY + 2, slotW - 4, slotH - 4);
+
+  // Crisp metallic edge highlights on top and bottom slot lips
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(slotX, slotY - 1.5, slotW, 2);
+  ctx.fillStyle = "#555558";
+  ctx.fillRect(slotX, slotY + slotH - 0.5, slotW, 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * Procedural normal map for slotted screw heads.
+ * Defines physical 3D groove sidewalls and crown curvature.
+ */
+function buildScrewNormalMap(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const center = size / 2;
+
+  // Base flat normal (0, 0, 1) -> (128, 128, 255)
+  ctx.fillStyle = "rgb(128, 128, 255)";
+  ctx.fillRect(0, 0, size, size);
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const data = imgData.data;
+
+  const slotHalfW = size * 0.34;
+  const slotHalfH = size * 0.0625;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const dx = x - center;
+      const dy = y - center;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      let nx = 0;
+      let ny = 0;
+      let nz = 1;
+
+      // Crown curvature towards edges
+      const maxR = size * 0.46;
+      if (dist < maxR && dist > 1) {
+        const falloff = Math.pow(dist / maxR, 2.5) * 0.4;
+        nx += (dx / dist) * falloff;
+        ny += (dy / dist) * falloff;
+      }
+
+      // Slot groove slopes
+      if (Math.abs(dx) <= slotHalfW && Math.abs(dy) <= slotHalfH + 3) {
+        const distFromSlotEdge = Math.abs(dy) - slotHalfH;
+        if (Math.abs(distFromSlotEdge) <= 3) {
+          const slotSlope = dy > 0 ? 0.75 : -0.75;
+          ny += slotSlope;
+        }
+      }
+
+      // Normalize vector
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx /= len;
+      ny /= len;
+      nz /= len;
+
+      data[idx] = Math.floor((nx * 0.5 + 0.5) * 255);
+      data[idx + 1] = Math.floor((-ny * 0.5 + 0.5) * 255);
+      data[idx + 2] = Math.floor((nz * 0.5 + 0.5) * 255);
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
 /* ------------------------------------------------------------------ */
 /* Shared PBR texture instances (built once, reused by all materials)  */
 /* ------------------------------------------------------------------ */
@@ -216,6 +356,8 @@ function buildWoodTexture(): THREE.CanvasTexture {
 let _enamelNormal: THREE.CanvasTexture | null = null;
 let _enamelRoughness: THREE.CanvasTexture | null = null;
 let _castIronNormal: THREE.CanvasTexture | null = null;
+let _screwTexture: THREE.CanvasTexture | null = null;
+let _screwNormal: THREE.CanvasTexture | null = null;
 
 function getEnamelNormal(): THREE.CanvasTexture {
   if (!_enamelNormal) _enamelNormal = buildEnamelNormalMap();
@@ -229,6 +371,14 @@ function getCastIronNormal(): THREE.CanvasTexture {
   if (!_castIronNormal) _castIronNormal = buildCastIronNormalMap();
   return _castIronNormal;
 }
+function getScrewTexture(): THREE.CanvasTexture {
+  if (!_screwTexture) _screwTexture = buildScrewTexture();
+  return _screwTexture;
+}
+function getScrewNormal(): THREE.CanvasTexture {
+  if (!_screwNormal) _screwNormal = buildScrewNormalMap();
+  return _screwNormal;
+}
 
 /* ------------------------------------------------------------------ */
 /* Material interfaces & builder                                       */
@@ -239,6 +389,7 @@ export interface MachineMaterials {
   enamelPanel: THREE.MeshPhysicalMaterial;
   castIron: THREE.MeshStandardMaterial;
   nickel: THREE.MeshStandardMaterial;
+  screw: THREE.MeshStandardMaterial;
   steelDark: THREE.MeshStandardMaterial;
   brass: THREE.MeshStandardMaterial;
   keyRim: THREE.MeshStandardMaterial;
@@ -286,6 +437,14 @@ export function buildMaterials(theme: MachineTheme = "midnight"): MachineMateria
       color: 0xd8d8d8,
       roughness: 0.32,
       metalness: 0.88,
+    }),
+    screw: new THREE.MeshStandardMaterial({
+      color: 0xe0e0e0,
+      roughness: 0.26,
+      metalness: 0.92,
+      map: getScrewTexture(),
+      normalMap: getScrewNormal(),
+      normalScale: new THREE.Vector2(0.8, 0.8),
     }),
     steelDark: new THREE.MeshStandardMaterial({
       color: 0x5a5a5c,
@@ -391,6 +550,13 @@ export function applyReflectionSettings(
   materials.nickel.roughness = isReflective ? 0.24 : 0.32;
   materials.nickel.metalness = isReflective ? 0.92 : 0.88;
   materials.nickel.needsUpdate = true;
+
+  if (materials.screw) {
+    materials.screw.envMapIntensity = env;
+    materials.screw.roughness = isReflective ? 0.20 : 0.26;
+    materials.screw.metalness = isReflective ? 0.94 : 0.92;
+    materials.screw.needsUpdate = true;
+  }
 
   materials.steelDark.envMapIntensity = env;
   materials.steelDark.roughness = isReflective ? 0.35 : 0.45;

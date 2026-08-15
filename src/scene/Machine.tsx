@@ -131,12 +131,16 @@ export function Machine() {
           if (Math.abs(progress - screwProgressRef.current) > 0.002 || progress === 0) {
             screwProgressRef.current = progress;
             const instanced = part.partGroup.userData.instanced as THREE.InstancedMesh;
-            const screwData = part.partGroup.userData.screwData as Array<{ p: THREE.Vector3; n: THREE.Vector3 }>;
+            const screwData = part.partGroup.userData.screwData as Array<{ p: THREE.Vector3; n: THREE.Vector3; rotZ?: number }>;
             const matrix = new THREE.Matrix4();
             const quaternion = new THREE.Quaternion();
             const upAxis = new THREE.Vector3(0, 1, 0);
+            const rollQuat = new THREE.Quaternion();
             screwData.forEach((screw, index) => {
               quaternion.setFromUnitVectors(upAxis, screw.n);
+              const spinAngle = (screw.rotZ || 0) + progress * 5.0;
+              rollQuat.setFromAxisAngle(screw.n, spinAngle);
+              quaternion.premultiply(rollQuat);
               matrix.compose(
                 screw.p.clone().addScaledVector(screw.n, 3.2 * progress),
                 quaternion,

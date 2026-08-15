@@ -10,11 +10,11 @@ import { PAPER } from "./constants";
 
 const KEY_SPACING = 1.9;
 const ROW_POS = [
-  { z: 5.4, y: 8.6 },
-  { z: 7.35, y: 7.95 },
-  { z: 9.3, y: 7.35 },
-  { z: 11.25, y: 6.75 },
-  { z: 13.3, y: 6.15 },
+  { z: 6.0, y: 8.6 },
+  { z: 7.95, y: 7.95 },
+  { z: 9.9, y: 7.35 },
+  { z: 11.85, y: 6.75 },
+  { z: 13.9, y: 6.15 },
 ];
 const KEY_CENTER_COL = 7.4;
 const PRINT_POINT = new THREE.Vector3(0, 14.6, -1.46);
@@ -1572,15 +1572,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       group.position.set(0, 4.8, 0);
 
       // Heavy contoured base chassis pan
-      const basePan = boxMesh(43.5, 2.6, 31.5, mats.enamel);
-      basePan.position.set(0, 0, 1.8);
+      const basePan = boxMesh(43.5, 2.6, 32.8, mats.enamel);
+      basePan.position.set(0, 0, 2.2);
       basePan.castShadow = true;
       basePan.receiveShadow = true;
       group.add(basePan);
 
       // Recessed stepped keyboard floor tray
-      const tray = boxMesh(38.5, 1.2, 14.8, mats.enamelPanel);
-      tray.position.set(0, 1.2, 9.6);
+      const tray = boxMesh(38.5, 1.2, 15.6, mats.enamelPanel);
+      tray.position.set(0, 1.2, 10.2);
       tray.castShadow = true;
       group.add(tray);
 
@@ -1605,15 +1605,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 21.4, 8.8, 1.8);
+        group.position.set(side * 21.4, 8.8, 2.2);
 
         // Die-cast contoured cheek panel
-        const panel = boxMesh(1.2, 8.6, 30.8, mats.enamelPanel);
+        const panel = boxMesh(1.2, 8.6, 32.2, mats.enamelPanel);
         panel.castShadow = true;
         group.add(panel);
 
         // Polished nickel accent trim strip
-        const trim = boxMesh(0.2, 0.35, 29.5, mats.nickel);
+        const trim = boxMesh(0.2, 0.35, 31.0, mats.nickel);
         trim.position.set(side * 0.65, 3.8, 0);
         group.add(trim);
         return null;
@@ -1646,14 +1646,14 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     {
       id: "frame.apron",
       label: "Front apron",
-      fn: "Sculpted enamel brow and badge plate above keyboard",
+      fn: "Sculpted enamel brow and badge plate enclosing keyboard",
       system: "frame",
       stagger: 0.88,
       offset: { pz: 5, py: -1.2 },
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 7.5, 15.8);
+      group.position.set(0, 7.5, 16.6);
 
       // Bevelled front apron
       const brow = boxMesh(41.5, 3.6, 1.2, mats.enamelPanel);
@@ -1730,8 +1730,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   for (const [x, z] of [
     [-18.5, -10.5],
     [18.5, -10.5],
-    [-18.5, 14.5],
-    [18.5, 14.5],
+    [-18.5, 15.2],
+    [18.5, 15.2],
   ] as const) {
     addPart(
       root,
@@ -1781,18 +1781,68 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   /* ------------------------------ Hardware ------------------------------ */
 
-  const screwData: Array<{ p: THREE.Vector3; n: THREE.Vector3 }> = [];
+  /** Lathed pan-head machine screw geometry with flange washer and planar UVs. */
+  function buildScrewGeometry(): THREE.BufferGeometry {
+    const points: THREE.Vector2[] = [
+      new THREE.Vector2(0.0, 0.16),
+      new THREE.Vector2(0.22, 0.14),
+      new THREE.Vector2(0.36, 0.11),
+      new THREE.Vector2(0.44, 0.06),
+      new THREE.Vector2(0.46, 0.0),
+      new THREE.Vector2(0.52, -0.01),
+      new THREE.Vector2(0.54, -0.07),
+      new THREE.Vector2(0.24, -0.08),
+      new THREE.Vector2(0.22, -0.42),
+      new THREE.Vector2(0.0, -0.45),
+    ];
+    const geo = new THREE.LatheGeometry(points, 24);
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      if (y >= -0.04) {
+        // Planar top-down UV projection for centered screwdriver slot
+        uv.setXY(i, 0.5 + x / 1.1, 0.5 + z / 1.1);
+      }
+    }
+    uv.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  const screwData: Array<{ p: THREE.Vector3; n: THREE.Vector3; rotZ: number }> = [];
+
+  // Left and Right side panel assembly screws (8 per side)
   for (const side of [-1, 1]) {
     for (let i = 0; i < 8; i++) {
+      const zCol = i < 4 ? -8.5 : 12.5;
+      const yRow = 5.6 + (i % 4) * 2.0;
       screwData.push({
-        p: new THREE.Vector3(side * 21.85, 5.6 + (i % 4) * 2, -9 + Math.floor(i / 4) * 18),
+        p: new THREE.Vector3(side * 22.05, yRow, zCol),
         n: new THREE.Vector3(side, 0, 0),
+        rotZ: (i * 0.73) % Math.PI,
       });
     }
   }
+
+  // Rear cowl back panel assembly screws (6 across rear wall)
   for (let i = 0; i < 6; i++) {
-    screwData.push({ p: new THREE.Vector3(-15 + i * 6, 8.6, -13), n: new THREE.Vector3(0, 0, -1) });
-    screwData.push({ p: new THREE.Vector3(-15 + i * 6, 7.6, 13.2), n: new THREE.Vector3(0, 0, 1) });
+    screwData.push({
+      p: new THREE.Vector3(-15 + i * 6, 8.8, -13.25),
+      n: new THREE.Vector3(0, 0, -1),
+      rotZ: (i * 1.1) % Math.PI,
+    });
+  }
+
+  // Front apron wall assembly screws (6 across front wall casing)
+  for (let i = 0; i < 6; i++) {
+    screwData.push({
+      p: new THREE.Vector3(-15 + i * 6, 6.8, 17.25),
+      n: new THREE.Vector3(0, 0, 1),
+      rotZ: (i * 0.95) % Math.PI,
+    });
   }
 
   addPart(
@@ -1806,13 +1856,17 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       offset: {},
     },
     (group) => {
-      const screwGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.5, 10);
-      const instanced = new THREE.InstancedMesh(screwGeometry, mats.nickel, screwData.length);
+      const screwGeometry = buildScrewGeometry();
+      const instanced = new THREE.InstancedMesh(screwGeometry, mats.screw ?? mats.nickel, screwData.length);
       const matrix = new THREE.Matrix4();
       const quaternion = new THREE.Quaternion();
       const upAxis = new THREE.Vector3(0, 1, 0);
+      const rollQuat = new THREE.Quaternion();
+
       screwData.forEach((screw, index) => {
         quaternion.setFromUnitVectors(upAxis, screw.n);
+        rollQuat.setFromAxisAngle(screw.n, screw.rotZ);
+        quaternion.premultiply(rollQuat);
         matrix.compose(screw.p, quaternion, new THREE.Vector3(1, 1, 1));
         instanced.setMatrixAt(index, matrix);
       });

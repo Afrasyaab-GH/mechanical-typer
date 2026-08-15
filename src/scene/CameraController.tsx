@@ -8,10 +8,10 @@ import type { CameraMode } from "../app/store";
 import { getBuild } from "./buildRegistry";
 
 const CAMERA_MODES: Record<CameraMode, { pos: THREE.Vector3; target: THREE.Vector3 }> = {
-  write: { pos: new THREE.Vector3(0, 25, 30), target: new THREE.Vector3(0, 14.2, -0.4) },
+  write: { pos: new THREE.Vector3(0, 25.5, 31.0), target: new THREE.Vector3(0, 14.0, 0.0) },
   paper: { pos: new THREE.Vector3(0, 19, 14), target: new THREE.Vector3(0, 15.2, -1.8) },
   mechanism: { pos: new THREE.Vector3(8.5, 14.0, 14.5), target: new THREE.Vector3(0, 11.8, -1.0) },
-  inspect: { pos: new THREE.Vector3(30, 22, 34), target: new THREE.Vector3(0, 9.5, 0.8) },
+  inspect: { pos: new THREE.Vector3(30, 22, 34), target: new THREE.Vector3(0, 9.5, 1.2) },
 };
 
 export function CameraController() {

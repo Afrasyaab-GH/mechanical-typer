@@ -206,10 +206,10 @@ export function ControlDesk() {
                 <span className="modern-sublabel" style={{ marginLeft: "6px" }}>Pitch:</span>
                 <div className="segmented">
                   {[
-                    { label: "10pt", size: 42, title: "10 Pitch (Compact Pica)" },
-                    { label: "12pt", size: 50, title: "12 Pitch (Standard)" },
-                    { label: "14pt", size: 58, title: "14 Pitch (Large Elite)" },
-                    { label: "16pt", size: 66, title: "16 Pitch (Headline)" },
+                    { label: "10pt", size: 42, title: "10 Pitch (Compact Pica - 42px)" },
+                    { label: "12pt", size: 50, title: "12 Pitch (Standard - 50px)" },
+                    { label: "14pt", size: 58, title: "14 Pitch (Large Elite - 58px)" },
+                    { label: "16pt", size: 66, title: "16 Pitch (Headline - 66px)" },
                   ].map((s) => (
                     <button
                       key={s.size}
@@ -219,6 +219,25 @@ export function ControlDesk() {
                       aria-pressed={state.typewriterFontSize === s.size}
                     >
                       {s.label}
+                    </button>
+                  ))}
+                </div>
+
+                <span className="modern-sublabel" style={{ marginLeft: "6px" }}>Spacing:</span>
+                <div className="segmented">
+                  {[
+                    { label: "Tight", val: 0.85, title: "Tight Pitch (85%)" },
+                    { label: "Auto", val: 1.0, title: "Proportional Auto (100%)" },
+                    { label: "Wide", val: 1.15, title: "Wide Pitch (115%)" },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      className={`hud-btn small seg ${Math.abs(state.typewriterLetterSpacing - p.val) < 0.02 ? "on" : ""}`}
+                      onClick={() => state.setTypewriterLetterSpacing(p.val)}
+                      title={p.title}
+                      aria-pressed={Math.abs(state.typewriterLetterSpacing - p.val) < 0.02}
+                    >
+                      {p.label}
                     </button>
                   ))}
                 </div>

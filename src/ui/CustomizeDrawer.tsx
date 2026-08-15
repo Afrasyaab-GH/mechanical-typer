@@ -53,6 +53,10 @@ export function CustomizeDrawer() {
   const setTypewriterFont = useStore((s) => s.setTypewriterFont);
   const typewriterFontSize = useStore((s) => s.typewriterFontSize);
   const setTypewriterFontSize = useStore((s) => s.setTypewriterFontSize);
+  const typewriterLetterSpacing = useStore((s) => s.typewriterLetterSpacing);
+  const setTypewriterLetterSpacing = useStore((s) => s.setTypewriterLetterSpacing);
+  const typewriterLineSpacing = useStore((s) => s.typewriterLineSpacing);
+  const setTypewriterLineSpacing = useStore((s) => s.setTypewriterLineSpacing);
 
   const autoReturn = useStore((s) => s.autoReturn);
   const toggleAutoReturn = useStore((s) => s.toggleAutoReturn);
@@ -196,14 +200,17 @@ export function CustomizeDrawer() {
             })}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-            <span style={{ fontSize: "11px", color: "var(--bone-dim)" }}>Text Size / Pitch:</span>
+          {/* Text Size / Font Scale */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px" }}>
+            <span style={{ fontSize: "11px", color: "var(--bone-dim)" }}>
+              Font Size: <strong style={{ color: "var(--bone-light)" }}>{typewriterFontSize}px</strong>
+            </span>
             <div className="segmented">
               {[
-                { label: "10pt", size: 42, title: "10 Pitch (Compact Pica)" },
-                { label: "12pt", size: 50, title: "12 Pitch (Standard)" },
-                { label: "14pt", size: 58, title: "14 Pitch (Large Elite)" },
-                { label: "16pt", size: 66, title: "16 Pitch (Headline)" },
+                { label: "10pt", size: 42, title: "10 Pitch (Compact Pica - 42px)" },
+                { label: "12pt", size: 50, title: "12 Pitch (Standard - 50px)" },
+                { label: "14pt", size: 58, title: "14 Pitch (Large Elite - 58px)" },
+                { label: "16pt", size: 66, title: "16 Pitch (Headline - 66px)" },
               ].map((s) => (
                 <button
                   key={s.size}
@@ -212,6 +219,81 @@ export function CustomizeDrawer() {
                   title={s.title}
                 >
                   {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Character Spacing / Pitch Slider (Dynamic Proportional & Manual Fine-Tuning) */}
+          <div style={{ marginTop: "12px", padding: "8px 10px", background: "rgba(0, 0, 0, 0.2)", borderRadius: "6px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", color: "var(--bone-dim)" }}>
+                Letter Spacing / Pitch:
+              </span>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--nickel)" }}>
+                {Math.round(typewriterLetterSpacing * 100)}% ({((typewriterFontSize * 0.62) * typewriterLetterSpacing).toFixed(1)}px / col)
+              </span>
+            </div>
+            
+            <input
+              type="range"
+              min="0.75"
+              max="1.50"
+              step="0.02"
+              value={typewriterLetterSpacing}
+              onChange={(e) => setTypewriterLetterSpacing(parseFloat(e.target.value))}
+              style={{ width: "100%", accentColor: "var(--nickel)", cursor: "pointer" }}
+              aria-label="Character Spacing Multiplier"
+            />
+
+            <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+              {[
+                { label: "Tight (85%)", val: 0.85 },
+                { label: "Auto (100%)", val: 1.0 },
+                { label: "Wide (115%)", val: 1.15 },
+                { label: "Airy (130%)", val: 1.30 },
+              ].map((p) => (
+                <button
+                  key={p.val}
+                  className={`hud-btn small seg ${Math.abs(typewriterLetterSpacing - p.val) < 0.02 ? "on" : ""}`}
+                  style={{ flex: 1, padding: "2px 4px", fontSize: "10px" }}
+                  onClick={() => setTypewriterLetterSpacing(p.val)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ fontSize: "9.5px", color: "var(--bone-dim)", marginTop: "6px", opacity: 0.8 }}>
+              ✦ Distance scales dynamically with text size to prevent letter overlap.
+            </div>
+          </div>
+
+          {/* Line Spacing Controls */}
+          <div style={{ marginTop: "10px", padding: "8px 10px", background: "rgba(0, 0, 0, 0.2)", borderRadius: "6px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", color: "var(--bone-dim)" }}>
+                Line Spacing:
+              </span>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--nickel)" }}>
+                {typewriterLineSpacing.toFixed(2)}x
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: "4px" }}>
+              {[
+                { label: "1.0x (Single)", val: 1.0 },
+                { label: "1.25x", val: 1.25 },
+                { label: "1.5x (Draft)", val: 1.5 },
+                { label: "2.0x (Double)", val: 2.0 },
+              ].map((p) => (
+                <button
+                  key={p.val}
+                  className={`hud-btn small seg ${Math.abs(typewriterLineSpacing - p.val) < 0.02 ? "on" : ""}`}
+                  style={{ flex: 1, padding: "3px 4px", fontSize: "10px" }}
+                  onClick={() => setTypewriterLineSpacing(p.val)}
+                >
+                  {p.label}
                 </button>
               ))}
             </div>

@@ -71,11 +71,21 @@ export class PaperTexture {
   documentTitle = "— THE IMPACT NO. 01 —";
   fontFamily = "Courier Prime";
   fontSizePx = 50;
+  letterSpacingMultiplier = 1.0;
+  lineSpacingMultiplier = 1.0;
   private ctx: CanvasRenderingContext2D;
   private background: HTMLCanvasElement;
   private manuscript: Manuscript;
   fontReady = false;
   onRepaint: (() => void) | null = null;
+
+  get cellWidth(): number {
+    return this.fontSizePx * 0.62 * this.letterSpacingMultiplier;
+  }
+
+  get lineHeight(): number {
+    return Math.max(this.fontSizePx * 1.36, PAPER.TEXT_H / 44) * this.lineSpacingMultiplier;
+  }
 
   constructor(manuscript: Manuscript) {
     this.manuscript = manuscript;
@@ -116,10 +126,21 @@ export class PaperTexture {
     this.repaint();
   }
 
-  setFont(fontFamily: string, fontSizePx?: number): void {
+  setFont(
+    fontFamily: string,
+    fontSizePx?: number,
+    letterSpacingMultiplier?: number,
+    lineSpacingMultiplier?: number,
+  ): void {
     this.fontFamily = fontFamily;
     if (fontSizePx !== undefined && fontSizePx > 0) {
       this.fontSizePx = fontSizePx;
+    }
+    if (letterSpacingMultiplier !== undefined && letterSpacingMultiplier > 0) {
+      this.letterSpacingMultiplier = letterSpacingMultiplier;
+    }
+    if (lineSpacingMultiplier !== undefined && lineSpacingMultiplier > 0) {
+      this.lineSpacingMultiplier = lineSpacingMultiplier;
     }
     if (typeof document !== "undefined" && document.fonts) {
       document.fonts
@@ -146,8 +167,8 @@ export class PaperTexture {
 
   private drawGlyph(glyph: Glyph): void {
     const ctx = this.ctx;
-    const x = PAPER.MARGIN_X + glyph.col * PAPER.CELL_W + glyph.xJitter * 1.5;
-    const y = PAPER.MARGIN_TOP + glyph.line * PAPER.LINE_H + PAPER.LINE_H * 0.76 + glyph.yJitter * 1.5;
+    const x = PAPER.MARGIN_X + glyph.col * this.cellWidth + glyph.xJitter * 1.5;
+    const y = PAPER.MARGIN_TOP + glyph.line * this.lineHeight + this.lineHeight * 0.76 + glyph.yJitter * 1.5;
 
     ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", "Courier New", monospace`;
     ctx.textBaseline = "alphabetic";
@@ -202,7 +223,7 @@ export class PaperTexture {
       // CONTINUOUS SCROLL MODE:
       // 48 lines fill the exact 0..1 UV canvas height
       const SCROLL_LOOP_LINES = 48;
-      const lineSpacing = this.canvas.height / SCROLL_LOOP_LINES;
+      const lineSpacing = (this.canvas.height / SCROLL_LOOP_LINES) * this.lineSpacingMultiplier;
       const minVisibleLine = Math.max(0, currentGlobalLine - SCROLL_LOOP_LINES + 3);
 
       for (let p = 0; p < this.manuscript.pages.length; p++) {
@@ -212,7 +233,7 @@ export class PaperTexture {
           if (gLine >= minVisibleLine && gLine <= currentGlobalLine) {
             const cyclicLine = ((gLine % SCROLL_LOOP_LINES) + SCROLL_LOOP_LINES) % SCROLL_LOOP_LINES;
             for (const glyph of pageRows[l]) {
-              const x = PAPER.MARGIN_X + glyph.col * PAPER.CELL_W + glyph.xJitter * 1.5;
+              const x = PAPER.MARGIN_X + glyph.col * this.cellWidth + glyph.xJitter * 1.5;
               const y = cyclicLine * lineSpacing + lineSpacing * 0.72 + glyph.yJitter * 1.5;
 
               const impressions = [...glyph.history, glyph.char];

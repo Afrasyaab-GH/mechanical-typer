@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getCore } from "../app/core";
 import { useStore } from "../app/store";
-import { buildMachine, CARRIAGE_HOME_X, CARRIAGE_STEP, type Pose } from "../machine/buildMachine";
+import { buildMachine, CARRIAGE_HOME_X, type Pose } from "../machine/buildMachine";
 import { KEYS } from "../machine/keyboardLayout";
 import { applyMachineTheme, applyReflectionSettings, buildMaterials } from "./Materials";
 import { clearHighlights, highlightPart } from "./partHighlight";
@@ -182,7 +182,12 @@ export function Machine() {
     build.refs.universalBarAction.position.y = -machine.universalBarDip() * 0.14;
 
     // --- Carriage train ---
-    build.refs.carriageGroup.position.x = CARRIAGE_HOME_X - machine.carriageCols * CARRIAGE_STEP;
+    const currentFontSize = useStore.getState().typewriterFontSize;
+    const currentLetterSpacing = useStore.getState().typewriterLetterSpacing;
+    const cellWidthPx = currentFontSize * 0.62 * currentLetterSpacing;
+    const dynamicCarriageStep = cellWidthPx * (21.0 / 2480);
+
+    build.refs.carriageGroup.position.x = CARRIAGE_HOME_X - machine.carriageCols * dynamicCarriageStep;
     build.refs.platenAction.rotation.x = machine.platenRotation;
     build.refs.ratchetAction.rotation.x = machine.platenRotation;
     build.refs.escapeWheelAction.rotation.z = -machine.escapeWheelAngle;

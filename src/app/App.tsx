@@ -89,9 +89,16 @@ export default function App() {
       }
       if (
         current.typewriterFont !== previous.typewriterFont ||
-        current.typewriterFontSize !== previous.typewriterFontSize
+        current.typewriterFontSize !== previous.typewriterFontSize ||
+        current.typewriterLetterSpacing !== previous.typewriterLetterSpacing ||
+        current.typewriterLineSpacing !== previous.typewriterLineSpacing
       ) {
-        core.paper.setFont(current.typewriterFont, current.typewriterFontSize);
+        core.paper.setFont(
+          current.typewriterFont,
+          current.typewriterFontSize,
+          current.typewriterLetterSpacing,
+          current.typewriterLineSpacing,
+        );
       }
       if (current.autoReturn !== previous.autoReturn) {
         core.manuscript.autoReturn = current.autoReturn;

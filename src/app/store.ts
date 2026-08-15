@@ -99,6 +99,12 @@ interface AppState {
   typewriterFontSize: number;
   setTypewriterFontSize: (size: number) => void;
 
+  typewriterLetterSpacing: number;
+  setTypewriterLetterSpacing: (spacing: number) => void;
+
+  typewriterLineSpacing: number;
+  setTypewriterLineSpacing: (spacing: number) => void;
+
   selectedPart: string | null;
   selectPart: (id: string | null) => void;
 
@@ -229,6 +235,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   typewriterFontSize: 50,
   setTypewriterFontSize: (typewriterFontSize) => set({ typewriterFontSize: Math.max(32, Math.min(80, typewriterFontSize)) }),
+
+  typewriterLetterSpacing: 1.0,
+  setTypewriterLetterSpacing: (typewriterLetterSpacing) =>
+    set({ typewriterLetterSpacing: Math.max(0.7, Math.min(1.6, typewriterLetterSpacing)) }),
+
+  typewriterLineSpacing: 1.0,
+  setTypewriterLineSpacing: (typewriterLineSpacing) =>
+    set({ typewriterLineSpacing: Math.max(0.8, Math.min(2.0, typewriterLineSpacing)) }),
 
   selectedPart: null,
   selectPart: (selectedPart) => set({ selectedPart }),

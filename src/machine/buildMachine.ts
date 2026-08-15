@@ -1461,7 +1461,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["paper.sheet"],
       },
       (group) => {
-        group.position.set(0, 13.1, -1.36);
+        group.position.set(0, 13.1, -1.20);
         const inner = new THREE.Group();
         group.add(inner);
         const frame = boxMesh(1.8, 1.4, 0.12, mats.nickel);
@@ -1504,8 +1504,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   );
   refs.ribbonSideL = makeRibbonSide();
   refs.ribbonSideR = makeRibbonSide();
-  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.1, -1.36);
-  refs.ribbonTipR = new THREE.Vector3(0.85, 13.1, -1.36);
+  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.1, -1.20);
+  refs.ribbonTipR = new THREE.Vector3(0.85, 13.1, -1.20);
 
   addPart(
     root,

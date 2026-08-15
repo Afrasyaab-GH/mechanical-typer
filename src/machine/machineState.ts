@@ -500,7 +500,7 @@ export class MachineState {
     const from = this.carriageCols;
     const to = Math.max(LEFT_COL, Math.min(this.manuscript.rightMargin, this.manuscript.cursor.col));
     this.carriageTarget = to;
-    this.carriageAnim = { from, to, start: this.now, dur: 55 };
+    this.carriageAnim = { from, to, start: this.now, dur: 70 };
     if (teeth > 0) {
       this.ribbonAngle += RIBBON_STEP * this.ribbonDirection;
       this.ribbonCharsSinceReverse++;
@@ -511,7 +511,7 @@ export class MachineState {
     }
   }
 
-  /** Keycap depression curve: 0–18ms down, held to 55ms, returned by 105ms. */
+  /** Keycap depression curve: 0–22ms down, held to 75ms, returned by 140ms. */
   keyDip(code: string): number {
     let dip = 0;
     for (const actor of this.actors) {
@@ -519,16 +519,16 @@ export class MachineState {
       const elapsed = this.now - actor.start;
       if (elapsed < 0) continue;
       let value: number;
-      if (elapsed < 18) value = easeOutQuad(elapsed / 18);
-      else if (elapsed < 55) value = 1;
-      else if (elapsed < 105) value = 1 - easeInOutQuad((elapsed - 55) / 50);
+      if (elapsed < 22) value = easeOutQuad(elapsed / 22);
+      else if (elapsed < 75) value = 1;
+      else if (elapsed < 140) value = 1 - easeInOutQuad((elapsed - 75) / 65);
       else value = 0;
       dip = Math.max(dip, value);
     }
     return dip;
   }
 
-  /** Typebar swing: instant rise 0–45ms, contacts 45–55ms, snappy return by 110ms. */
+  /** Typebar swing: visible smooth rise 0–70ms, contacts 70–80ms, snappy return by 150ms. */
   typebarSwing(typebar: number): number {
     let swing = 0;
     for (const actor of this.actors) {
@@ -536,16 +536,23 @@ export class MachineState {
       const elapsed = this.now - actor.start;
       if (elapsed < 0) continue;
       let value: number;
-      if (elapsed < 45) value = easeInQuad(elapsed / 45) * 1.05;
-      else if (elapsed < 55) value = 1.05 - 0.05 * easeOutQuad((elapsed - 45) / 10);
-      else if (elapsed < 110) value = 1 - easeInOutQuad((elapsed - 55) / 55);
-      else value = 0;
+      if (elapsed < 70) {
+        // Balanced ease: lifts out of basket visibly on frame 1, whips into platen at 70ms
+        const p = elapsed / 70;
+        value = (0.35 * p + 0.65 * (p * p)) * 1.04;
+      } else if (elapsed < 80) {
+        value = 1.04 - 0.04 * easeOutQuad((elapsed - 70) / 10);
+      } else if (elapsed < 150) {
+        value = 1 - easeInOutQuad((elapsed - 80) / 70);
+      } else {
+        value = 0;
+      }
       swing = Math.max(swing, value);
     }
     return swing;
   }
 
-  /** Ribbon vibrator lift: rises 0–30ms, holds 30–60ms, drops by 95ms. */
+  /** Ribbon vibrator lift: rises 0–40ms, holds 40–85ms, drops by 130ms. */
   vibratorLift(): number {
     let lift = 0;
     for (const actor of this.actors) {
@@ -553,9 +560,9 @@ export class MachineState {
       const elapsed = this.now - actor.start;
       if (elapsed < 0) continue;
       let value = 0;
-      if (elapsed < 30) value = easeOutQuad(elapsed / 30);
-      else if (elapsed < 60) value = 1;
-      else if (elapsed < 95) value = 1 - easeInQuad((elapsed - 60) / 35);
+      if (elapsed < 40) value = easeOutQuad(elapsed / 40);
+      else if (elapsed < 85) value = 1;
+      else if (elapsed < 130) value = 1 - easeInQuad((elapsed - 85) / 45);
       lift = Math.max(lift, value);
     }
     return lift;
@@ -565,7 +572,7 @@ export class MachineState {
     let dip = 0;
     for (const actor of this.actors) {
       const elapsed = this.now - actor.start;
-      if (elapsed >= 10 && elapsed < 65) dip = 1;
+      if (elapsed >= 15 && elapsed < 85) dip = 1;
     }
     return dip;
   }

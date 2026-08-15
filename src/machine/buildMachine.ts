@@ -111,6 +111,59 @@ function rodBetween(
   return mesh;
 }
 
+/** Contoured box geometry with smoothed rounded corner pillars and filleted bevels. */
+function createRoundedBoxGeometry(
+  width: number,
+  height: number,
+  depth: number,
+  radius = 0.4,
+  bevelRadius = 0.15,
+): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  const x = -width / 2;
+  const y = -depth / 2;
+  const w = width;
+  const d = depth;
+  const r = Math.min(radius, w / 4, d / 4);
+
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + d - r);
+  shape.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  shape.lineTo(x + r, y + d);
+  shape.quadraticCurveTo(x, y + d, x, y + d - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: Math.max(0.01, height - bevelRadius * 2),
+    bevelEnabled: bevelRadius > 0.001,
+    bevelSegments: 4,
+    steps: 1,
+    bevelSize: bevelRadius,
+    bevelThickness: bevelRadius,
+    curveSegments: 8,
+  };
+
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geo.center();
+  geo.rotateX(Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function roundedBoxMesh(
+  w: number,
+  h: number,
+  d: number,
+  radius: number,
+  bevel: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  return new THREE.Mesh(createRoundedBoxGeometry(w, h, d, radius, bevel), material);
+}
+
 function boxMesh(w: number, h: number, d: number, material: THREE.Material): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
 }
@@ -1571,22 +1624,22 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     (group) => {
       group.position.set(0, 4.8, 0);
 
-      // Heavy contoured base chassis pan
-      const basePan = boxMesh(43.5, 2.6, 32.8, mats.enamel);
-      basePan.position.set(0, 0, 2.2);
+      // Heavy contoured base chassis pan with filleted corners
+      const basePan = roundedBoxMesh(40.2, 2.6, 26.4, 0.6, 0.2, mats.enamel);
+      basePan.position.set(0, 0, 4.4);
       basePan.castShadow = true;
       basePan.receiveShadow = true;
       group.add(basePan);
 
       // Recessed stepped keyboard floor tray
-      const tray = boxMesh(38.5, 1.2, 15.6, mats.enamelPanel);
+      const tray = roundedBoxMesh(36.0, 1.2, 14.2, 0.35, 0.1, mats.enamelPanel);
       tray.position.set(0, 1.2, 10.2);
       tray.castShadow = true;
       group.add(tray);
 
       // Segment frame cradle
-      const cradle = boxMesh(28, 2.2, 8, mats.steelDark);
-      cradle.position.set(0, 2.2, -3.5);
+      const cradle = boxMesh(26, 2.2, 6.5, mats.steelDark);
+      cradle.position.set(0, 2.2, -3.2);
       group.add(cradle);
       return null;
     },
@@ -1605,16 +1658,16 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 21.4, 8.8, 2.2);
+        group.position.set(side * 19.6, 8.8, 4.4);
 
-        // Die-cast contoured cheek panel
-        const panel = boxMesh(1.2, 8.6, 32.2, mats.enamelPanel);
+        // Die-cast contoured cheek panel with rounded corner pillars
+        const panel = roundedBoxMesh(1.1, 8.6, 26.0, 0.45, 0.15, mats.enamelPanel);
         panel.castShadow = true;
         group.add(panel);
 
         // Polished nickel accent trim strip
-        const trim = boxMesh(0.2, 0.35, 31.0, mats.nickel);
-        trim.position.set(side * 0.65, 3.8, 0);
+        const trim = boxMesh(0.18, 0.32, 24.8, mats.nickel);
+        trim.position.set(side * 0.6, 3.8, 0);
         group.add(trim);
         return null;
       },
@@ -1633,8 +1686,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 8.8, -12.6);
-      const back = boxMesh(43.5, 8.6, 1.2, mats.enamelPanel);
+      group.position.set(0, 8.8, -8.6);
+      const back = roundedBoxMesh(40.2, 8.6, 1.1, 0.45, 0.15, mats.enamelPanel);
       back.castShadow = true;
       group.add(back);
       return null;
@@ -1655,15 +1708,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     (group) => {
       group.position.set(0, 7.5, 16.6);
 
-      // Bevelled front apron
-      const brow = boxMesh(41.5, 3.6, 1.2, mats.enamelPanel);
+      // Bevelled front apron with rounded corners
+      const brow = roundedBoxMesh(38.4, 3.6, 1.1, 0.4, 0.15, mats.enamelPanel);
       brow.rotation.x = 0.18;
       brow.castShadow = true;
       group.add(brow);
 
       // Polished vintage brass badge plate
       const plate = boxMesh(11.5, 1.6, 0.24, mats.brass);
-      plate.position.set(0, 0.45, 0.7);
+      plate.position.set(0, 0.45, 0.65);
       plate.rotation.x = 0.18;
       group.add(plate);
 
@@ -1671,7 +1724,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         new THREE.PlaneGeometry(10.5, 1.2),
         new THREE.MeshBasicMaterial({ map: keycapTexture("THE IMPACT No. 01", ""), transparent: true }),
       );
-      name.position.set(0, 0.45, 0.84);
+      name.position.set(0, 0.45, 0.79);
       name.rotation.x = 0.18;
       group.add(name);
       return null;
@@ -1691,15 +1744,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 14.6, 12.2, -1);
-        const deck = boxMesh(13.8, 0.5, 15.2, mats.enamelPanel);
+        group.position.set(side * 13.5, 12.2, -0.5);
+        const deck = roundedBoxMesh(12.0, 0.45, 14.2, 0.3, 0.08, mats.enamelPanel);
         deck.castShadow = true;
         deck.receiveShadow = true;
         group.add(deck);
 
         // Circular spool bezel ring
         const bezel = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, 0.2, 28), mats.nickel);
-        bezel.position.set(side * -6.6, 0.35, 1.5);
+        bezel.position.set(side * -5.5, 0.32, 1.0);
         group.add(bezel);
         return null;
       },
@@ -1718,8 +1771,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 12.2, -9.4);
-      const rear = boxMesh(29.5, 0.5, 6.8, mats.enamelPanel);
+      group.position.set(0, 12.2, -6.8);
+      const rear = roundedBoxMesh(27.0, 0.45, 3.4, 0.25, 0.08, mats.enamelPanel);
       rear.castShadow = true;
       group.add(rear);
       return null;
@@ -1728,10 +1781,10 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   // 4 vulcanized dark rubber support feet
   for (const [x, z] of [
-    [-18.5, -10.5],
-    [18.5, -10.5],
-    [-18.5, 15.2],
-    [18.5, 15.2],
+    [-17.2, -6.8],
+    [17.2, -6.8],
+    [-17.2, 15.2],
+    [17.2, 15.2],
   ] as const) {
     addPart(
       root,
@@ -1817,10 +1870,10 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   // Left and Right side panel assembly screws (8 per side)
   for (const side of [-1, 1]) {
     for (let i = 0; i < 8; i++) {
-      const zCol = i < 4 ? -8.5 : 12.5;
+      const zCol = i < 4 ? -6.5 : 12.5;
       const yRow = 5.6 + (i % 4) * 2.0;
       screwData.push({
-        p: new THREE.Vector3(side * 22.05, yRow, zCol),
+        p: new THREE.Vector3(side * 20.25, yRow, zCol),
         n: new THREE.Vector3(side, 0, 0),
         rotZ: (i * 0.73) % Math.PI,
       });
@@ -1830,7 +1883,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   // Rear cowl back panel assembly screws (6 across rear wall)
   for (let i = 0; i < 6; i++) {
     screwData.push({
-      p: new THREE.Vector3(-15 + i * 6, 8.8, -13.25),
+      p: new THREE.Vector3(-14 + i * 5.6, 8.8, -9.25),
       n: new THREE.Vector3(0, 0, -1),
       rotZ: (i * 1.1) % Math.PI,
     });
@@ -1839,7 +1892,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   // Front apron wall assembly screws (6 across front wall casing)
   for (let i = 0; i < 6; i++) {
     screwData.push({
-      p: new THREE.Vector3(-15 + i * 6, 6.8, 17.25),
+      p: new THREE.Vector3(-14 + i * 5.6, 6.8, 17.25),
       n: new THREE.Vector3(0, 0, 1),
       rotZ: (i * 0.95) % Math.PI,
     });

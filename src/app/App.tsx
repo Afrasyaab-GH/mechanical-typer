@@ -76,9 +76,13 @@ export default function App() {
     const offAutoSave2 = core.manuscript.bus.on("structure", autoSave);
 
     if (loadDraft()) state.setDraftExists(true);
+    core.paper.setFeedMode(state.feedMode);
 
     const offStoreSubscriptions = useStore.subscribe((current, previous) => {
       if (current.unicodeAdapter && !previous.unicodeAdapter) input.focusIme();
+      if (current.feedMode !== previous.feedMode) {
+        core.paper.setFeedMode(current.feedMode);
+      }
       if (current.documentTitle !== previous.documentTitle) {
         core.paper.setTitle(current.documentTitle);
       }

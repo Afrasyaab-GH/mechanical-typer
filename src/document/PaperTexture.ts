@@ -135,6 +135,15 @@ export class PaperTexture {
     }
   }
 
+  feedMode: "sheet" | "scroll" = "sheet";
+
+  setFeedMode(mode: "sheet" | "scroll"): void {
+    if (this.feedMode !== mode) {
+      this.feedMode = mode;
+      this.repaint(mode);
+    }
+  }
+
   private drawGlyph(glyph: Glyph): void {
     const ctx = this.ctx;
     const x = PAPER.MARGIN_X + glyph.col * PAPER.CELL_W + glyph.xJitter * 1.5;
@@ -161,7 +170,8 @@ export class PaperTexture {
     });
   }
 
-  repaint(): void {
+  repaint(feedMode: "sheet" | "scroll" = this.feedMode): void {
+    this.feedMode = feedMode;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.background, 0, 0);
@@ -176,12 +186,29 @@ export class PaperTexture {
       ctx.textAlign = "left";
     }
 
-    const page = Math.min(this.manuscript.cursor.page, this.manuscript.pages.length - 1);
-    const rows = this.manuscript.pages[page] ?? [];
-
-    for (const line of rows) {
-      for (const glyph of line) {
-        this.drawGlyph(glyph);
+    if (feedMode === "sheet") {
+      // Standard A4 page drawing
+      const page = Math.min(this.manuscript.cursor.page, this.manuscript.pages.length - 1);
+      const rows = this.manuscript.pages[page] ?? [];
+      for (const line of rows) {
+        for (const glyph of line) {
+          this.drawGlyph(glyph);
+        }
+      }
+    } else {
+      // Continuous Scroll Mode: draw all lines from all pages in continuous sequence
+      // Collect all glyphs into a flattened array of global lines
+      for (let p = 0; p < this.manuscript.pages.length; p++) {
+        const pageRows = this.manuscript.pages[p] ?? [];
+        for (let l = 0; l < pageRows.length; l++) {
+          const globalLine = p * 44 + l;
+          for (const glyph of pageRows[l]) {
+            // Map globalLine cyclically onto the canvas height
+            const cyclicLine = globalLine % 44;
+            const cyclicGlyph = { ...glyph, line: cyclicLine };
+            this.drawGlyph(cyclicGlyph);
+          }
+        }
       }
     }
 

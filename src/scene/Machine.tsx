@@ -54,6 +54,11 @@ export function Machine() {
 
   const selectedPart = useStore((s) => s.selectedPart);
   const trace = useStore((s) => s.trace);
+  const feedMode = useStore((s) => s.feedMode);
+
+  useEffect(() => {
+    core.paper.setFeedMode(feedMode);
+  }, [core.paper, feedMode]);
 
   useEffect(() => {
     applyMachineTheme(materials, machineTheme);

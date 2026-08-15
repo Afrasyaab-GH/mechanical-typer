@@ -233,9 +233,9 @@ export function samplePaperGuidePath(s: number, p: PaperPathParams): [number, nu
   const sTrayEnd = trayLength;
   const sArcEnd = sTrayEnd + arcLength;
 
-  // SEGMENT 1: Rear Feed Tray (s from 0 to sTrayEnd)
+  // SEGMENT 1: Rear Feed Tray (extrapolates cleanly for any s <= sTrayEnd)
   if (s <= sTrayEnd) {
-    const distFromRoller = Math.max(0, sTrayEnd - s);
+    const distFromRoller = sTrayEnd - s; // positive distance up the rear tray
     const lipY = cy;
     const lipZ = cz - r;
     const y = lipY + distFromRoller * Math.cos(feedAngle) + 0.03 * Math.sin(feedAngle);
@@ -422,7 +422,7 @@ function buildPaperMesh(paper: PaperTexture): {
       if (currentMode === "sheet") {
         // Single sheet of fixed length: bottom edge drains as top edge advances
         const s = sTop - v * sheetLength;
-        [y, z] = samplePaperGuidePath(Math.max(0, s), pathParams);
+        [y, z] = samplePaperGuidePath(s, pathParams);
         uvV = 1.0 - v;
       } else {
         // Closed loop conveyor ribbon: 3D station sampled around closed track

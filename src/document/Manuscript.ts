@@ -1,10 +1,9 @@
 import { EventBus } from "../machine/events";
 import {
-  BELL_COL,
   COLS,
   LEFT_COL,
   LINES,
-  RIGHT_MARGIN,
+  PAPER,
   glyphVariation,
 } from "../machine/constants";
 
@@ -21,6 +20,10 @@ export interface Glyph {
   overstrikeCount: number;
   history: string[];
   viaUnicodeAdapter: boolean;
+  fontSize?: number;
+  fontFamily?: string;
+  cellWidth?: number;
+  lineHeight?: number;
 }
 
 export interface Cursor {
@@ -30,7 +33,17 @@ export interface Cursor {
 }
 
 export type EditAction =
-  | { type: "TYPE_CHAR"; char: string; code: string; timestamp: number; viaUnicodeAdapter?: boolean }
+  | {
+      type: "TYPE_CHAR";
+      char: string;
+      code: string;
+      timestamp: number;
+      viaUnicodeAdapter?: boolean;
+      fontSize?: number;
+      fontFamily?: string;
+      cellWidth?: number;
+      lineHeight?: number;
+    }
   | { type: "SPACE"; timestamp: number }
   | { type: "TAB"; timestamp: number }
   | { type: "BACKSPACE"; timestamp: number }
@@ -59,7 +72,7 @@ export interface ManuscriptJSON {
 }
 
 /**
- * The mechanical document: 44 lines per page, 72 cells per line.
+ * The mechanical document: lines per page, cells per line.
  * Backspace moves the carriage but never erases ink; typing into an
  * occupied cell creates an overstrike.
  */
@@ -73,6 +86,47 @@ export class Manuscript {
   undoStack: UndoEntry[] = [];
   redoStack: UndoEntry[] = [];
   private strikeCounter = 0;
+
+  activeFontSize = 50;
+  activeFontFamily = "Courier Prime";
+  activeLetterSpacing = 1.0;
+  activeLineSpacing = 1.0;
+
+  get activeCellWidth(): number {
+    return this.activeFontSize * 0.62 * this.activeLetterSpacing;
+  }
+
+  get activeLineHeight(): number {
+    return Math.max(this.activeFontSize * 1.36, PAPER.TEXT_H / LINES) * this.activeLineSpacing;
+  }
+
+  get rightMargin(): number {
+    return Math.max(24, Math.min(COLS, Math.floor(PAPER.TEXT_W / this.activeCellWidth)));
+  }
+
+  get bellCol(): number {
+    return Math.max(1, this.rightMargin - 6);
+  }
+
+  get maxLines(): number {
+    return Math.max(15, Math.min(LINES, Math.floor(PAPER.TEXT_H / this.activeLineHeight)));
+  }
+
+  setTypeStyle(
+    fontFamily?: string,
+    fontSizePx?: number,
+    letterSpacingMultiplier?: number,
+    lineSpacingMultiplier?: number,
+  ): void {
+    if (fontFamily !== undefined && fontFamily.length > 0) this.activeFontFamily = fontFamily;
+    if (fontSizePx !== undefined && fontSizePx > 0) this.activeFontSize = fontSizePx;
+    if (letterSpacingMultiplier !== undefined && letterSpacingMultiplier > 0) {
+      this.activeLetterSpacing = letterSpacingMultiplier;
+    }
+    if (lineSpacingMultiplier !== undefined && lineSpacingMultiplier > 0) {
+      this.activeLineSpacing = lineSpacingMultiplier;
+    }
+  }
 
   glyphAt(page: number, line: number, col: number): Glyph | null {
     const row = this.pages[page]?.[line];
@@ -129,11 +183,22 @@ export class Manuscript {
   apply(action: EditAction): EditResult {
     switch (action.type) {
       case "TYPE_CHAR":
-        return this.typeChar(action.char, action.code, action.timestamp, action.viaUnicodeAdapter === true);
+        return this.typeChar(
+          action.char,
+          action.code,
+          action.timestamp,
+          action.viaUnicodeAdapter === true,
+          {
+            fontSize: action.fontSize ?? this.activeFontSize,
+            fontFamily: action.fontFamily ?? this.activeFontFamily,
+            cellWidth: action.cellWidth ?? this.activeCellWidth,
+            lineHeight: action.lineHeight ?? this.activeLineHeight,
+          },
+        );
       case "SPACE":
         return this.advanceCursor(1);
       case "TAB": {
-        const target = Math.min(RIGHT_MARGIN, (Math.floor(this.cursor.col / 8) + 1) * 8);
+        const target = Math.min(this.rightMargin, (Math.floor(this.cursor.col / 8) + 1) * 8);
         return this.advanceCursor(target - this.cursor.col);
       }
       case "BACKSPACE":
@@ -145,20 +210,26 @@ export class Manuscript {
     }
   }
 
-  private typeChar(char: string, code: string, timestamp: number, viaUnicodeAdapter: boolean): EditResult {
+  private typeChar(
+    char: string,
+    code: string,
+    timestamp: number,
+    viaUnicodeAdapter: boolean,
+    style?: { fontSize?: number; fontFamily?: string; cellWidth?: number; lineHeight?: number },
+  ): EditResult {
     if (this.pageFull) {
       if (this.autoNextPage) {
         this.newSheet();
-        return this.typeChar(char, code, timestamp, viaUnicodeAdapter);
+        return this.typeChar(char, code, timestamp, viaUnicodeAdapter, style);
       }
       this.bus.emit("rejected", { reason: "pageFull" });
       return { accepted: false, blockedByPageFull: true };
     }
-    if (this.cursor.col >= RIGHT_MARGIN) {
+    if (this.cursor.col >= this.rightMargin) {
       if (this.autoReturn) {
         const returned = this.carriageReturn();
         if (!returned.accepted) return returned;
-        const result = this.typeChar(char, code, timestamp, viaUnicodeAdapter);
+        const result = this.typeChar(char, code, timestamp, viaUnicodeAdapter, style);
         result.autoReturned = true;
         return result;
       }
@@ -170,6 +241,11 @@ export class Manuscript {
     const variation = glyphVariation(page, line, col, char, this.strikeCounter++);
     const existing = this.glyphAt(page, line, col);
     let glyph: Glyph;
+
+    const fontSize = style?.fontSize ?? this.activeFontSize;
+    const fontFamily = style?.fontFamily ?? this.activeFontFamily;
+    const cellWidth = style?.cellWidth ?? this.activeCellWidth;
+    const lineHeight = style?.lineHeight ?? this.activeLineHeight;
 
     if (existing) {
       const overstrikeCount = existing.overstrikeCount + 1;
@@ -184,6 +260,10 @@ export class Manuscript {
         xJitter: existing.xJitter + variation.xJitter * (0.5 + 0.5 * overstrikeCount),
         yJitter: existing.yJitter + variation.yJitter * (0.5 + 0.5 * overstrikeCount),
         viaUnicodeAdapter,
+        fontSize: existing.fontSize ?? fontSize,
+        fontFamily: existing.fontFamily ?? fontFamily,
+        cellWidth: existing.cellWidth ?? cellWidth,
+        lineHeight: existing.lineHeight ?? lineHeight,
       };
       const row = this.pages[page][line];
       row[row.indexOf(existing)] = glyph;
@@ -201,6 +281,10 @@ export class Manuscript {
         overstrikeCount: 0,
         history: [],
         viaUnicodeAdapter,
+        fontSize,
+        fontFamily,
+        cellWidth,
+        lineHeight,
       };
       const row = this.pages[page][line];
       let index = 0;
@@ -211,7 +295,7 @@ export class Manuscript {
     const cursorBefore = { ...this.cursor };
     this.undoStack.push({ kind: "glyph", cursorBefore, before: existing, after: glyph });
     this.redoStack.length = 0;
-    const bell = this.cursor.col === BELL_COL - 1;
+    const bell = this.cursor.col === this.bellCol - 1;
     this.cursor.col++;
     this.bus.emit("changed", { page });
     if (bell) this.bus.emit("bell", {});
@@ -228,7 +312,7 @@ export class Manuscript {
       return { accepted: false, blockedByPageFull: true };
     }
     if (amount <= 0) return { accepted: false };
-    if (this.cursor.col >= RIGHT_MARGIN) {
+    if (this.cursor.col >= this.rightMargin) {
       if (this.autoReturn) {
         const result = this.carriageReturn();
         if (result.accepted) {
@@ -241,8 +325,8 @@ export class Manuscript {
       return { accepted: false, blockedByMargin: true };
     }
     const cursorBefore = { ...this.cursor };
-    const bell = this.cursor.col < BELL_COL && this.cursor.col + amount >= BELL_COL;
-    this.cursor.col = Math.min(RIGHT_MARGIN, this.cursor.col + amount);
+    const bell = this.cursor.col < this.bellCol && this.cursor.col + amount >= this.bellCol;
+    this.cursor.col = Math.min(this.rightMargin, this.cursor.col + amount);
     this.undoStack.push({ kind: "cursor", cursorBefore, cursorAfter: { ...this.cursor } });
     this.redoStack.length = 0;
     this.bus.emit("changed", { page: this.cursor.page });
@@ -279,7 +363,7 @@ export class Manuscript {
       const prevRow = this.pages[page]?.[this.cursor.line] ?? [];
       if (prevRow.length > 0) {
         const lastGlyph = prevRow[prevRow.length - 1];
-        this.cursor.col = Math.min(RIGHT_MARGIN, lastGlyph.col + 1);
+        this.cursor.col = Math.min(this.rightMargin, lastGlyph.col + 1);
       } else {
         this.cursor.col = LEFT_COL;
       }
@@ -291,11 +375,11 @@ export class Manuscript {
     } else if (this.cursor.col <= LEFT_COL && this.cursor.line === 0 && this.cursor.page > 0) {
       const cursorBefore = { ...this.cursor };
       this.cursor.page--;
-      this.cursor.line = LINES - 1;
+      this.cursor.line = this.maxLines - 1;
       const prevRow = this.pages[this.cursor.page]?.[this.cursor.line] ?? [];
       if (prevRow.length > 0) {
         const lastGlyph = prevRow[prevRow.length - 1];
-        this.cursor.col = Math.min(RIGHT_MARGIN, lastGlyph.col + 1);
+        this.cursor.col = Math.min(this.rightMargin, lastGlyph.col + 1);
       } else {
         this.cursor.col = LEFT_COL;
       }
@@ -319,7 +403,7 @@ export class Manuscript {
       return { accepted: false, blockedByPageFull: true };
     }
     const cursorBefore = { ...this.cursor };
-    if (this.cursor.line >= LINES - 1) {
+    if (this.cursor.line >= this.maxLines - 1) {
       if (this.autoNextPage) {
         this.newSheet();
         return { accepted: true };
@@ -464,7 +548,7 @@ export class Manuscript {
     for (const pageText of text.split("\f")) {
       if (this.cursor.page > 0) this.newSheet();
       for (const line of pageText.split("\n")) {
-        for (const char of line.slice(0, RIGHT_MARGIN)) {
+        for (const char of line.slice(0, this.rightMargin)) {
           this.typeChar(char, char === " " ? "Space" : "SAMPLE", timestamp, false);
         }
         this.carriageReturn();

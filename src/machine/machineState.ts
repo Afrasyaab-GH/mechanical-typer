@@ -9,7 +9,6 @@ import {
   LEFT_COL,
   LINKAGE_MS,
   RIBBON_STEP,
-  RIGHT_MARGIN,
   TYPEBAR_CYCLE_MS,
 } from "./constants";
 import {
@@ -125,10 +124,11 @@ export class MachineState {
   /** Column the carriage will reach once queued actors complete. */
   projectedCol(): number {
     let col = this.manuscript.cursor.col;
+    const margin = this.manuscript.rightMargin;
     for (const actor of this.actors) {
       if (actor.impacted || actor.escaped) continue;
       if (actor.kind === "char" || actor.kind === "space") {
-        if (col >= RIGHT_MARGIN && this.manuscript.autoReturn) {
+        if (col >= margin && this.manuscript.autoReturn) {
           col = 1;
         } else {
           col++;
@@ -136,8 +136,8 @@ export class MachineState {
       } else if (actor.kind === "backspace") {
         col = Math.max(LEFT_COL, col - 1);
       } else if (actor.kind === "tab") {
-        if (col >= RIGHT_MARGIN && this.manuscript.autoReturn) col = 0;
-        col = Math.min(RIGHT_MARGIN, (Math.floor(col / 8) + 1) * 8);
+        if (col >= margin && this.manuscript.autoReturn) col = 0;
+        col = Math.min(margin, (Math.floor(col / 8) + 1) * 8);
       }
     }
     return col;
@@ -276,7 +276,7 @@ export class MachineState {
         this.bus.emit("rejected", { reason: "pageFull" });
         return false;
       }
-      if (this.projectedCol() >= RIGHT_MARGIN && !this.manuscript.autoReturn) {
+      if (this.projectedCol() >= this.manuscript.rightMargin && !this.manuscript.autoReturn) {
         this.bus.emit("rejected", { reason: "margin" });
         this.ringBell();
         return false;
@@ -493,7 +493,7 @@ export class MachineState {
     this.bus.emit("escapement", { kind: teeth > 0 ? "char" : "backspace" });
     this.escapeWheelTarget += teeth * 0.35;
     const from = this.carriageCols;
-    const to = Math.max(LEFT_COL, Math.min(RIGHT_MARGIN, this.manuscript.cursor.col));
+    const to = Math.max(LEFT_COL, Math.min(this.manuscript.rightMargin, this.manuscript.cursor.col));
     this.carriageTarget = to;
     this.carriageAnim = { from, to, start: this.now, dur: 90 };
     if (teeth > 0) {

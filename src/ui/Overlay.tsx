@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { getCore } from "../app/core";
 import { useStore } from "../app/store";
 import { t } from "../app/i18n";
-import { BELL_COL } from "../machine/constants";
 import { discardDraft, loadDraft } from "../document/draftStorage";
 import type { InputManager } from "../input/InputManager";
 import { ControlDesk } from "./ControlDesk";
@@ -23,7 +22,7 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
   }, [manager]);
 
   const exploded = state.explodeCurrent > 0.08;
-  const atMargin = state.stats.col >= BELL_COL && !state.stats.pageFull && !exploded;
+  const atMargin = state.stats.col >= core.manuscript.bellCol && !state.stats.pageFull && !exploded;
   const pageFull = state.stats.pageFull && !exploded;
 
   const resumeDraft = () => {

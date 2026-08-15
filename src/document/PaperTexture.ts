@@ -167,10 +167,15 @@ export class PaperTexture {
 
   private drawGlyph(glyph: Glyph): void {
     const ctx = this.ctx;
-    const x = PAPER.MARGIN_X + glyph.col * this.cellWidth + glyph.xJitter * 1.5;
-    const y = PAPER.MARGIN_TOP + glyph.line * this.lineHeight + this.lineHeight * 0.76 + glyph.yJitter * 1.5;
+    const fontSize = glyph.fontSize ?? this.fontSizePx;
+    const fontFamily = glyph.fontFamily ?? this.fontFamily;
+    const cellWidth = glyph.cellWidth ?? this.cellWidth;
+    const lineHeight = glyph.lineHeight ?? this.lineHeight;
 
-    ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", "Courier New", monospace`;
+    const x = PAPER.MARGIN_X + glyph.col * cellWidth + glyph.xJitter * 1.5;
+    const y = PAPER.MARGIN_TOP + glyph.line * lineHeight + lineHeight * 0.76 + glyph.yJitter * 1.5;
+
+    ctx.font = `bold ${fontSize}px "${fontFamily}", "Courier Prime", "Courier New", monospace`;
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
 
@@ -233,7 +238,11 @@ export class PaperTexture {
           if (gLine >= minVisibleLine && gLine <= currentGlobalLine) {
             const cyclicLine = ((gLine % SCROLL_LOOP_LINES) + SCROLL_LOOP_LINES) % SCROLL_LOOP_LINES;
             for (const glyph of pageRows[l]) {
-              const x = PAPER.MARGIN_X + glyph.col * this.cellWidth + glyph.xJitter * 1.5;
+              const fontSize = glyph.fontSize ?? this.fontSizePx;
+              const fontFamily = glyph.fontFamily ?? this.fontFamily;
+              const cellWidth = glyph.cellWidth ?? this.cellWidth;
+
+              const x = PAPER.MARGIN_X + glyph.col * cellWidth + glyph.xJitter * 1.5;
               const y = cyclicLine * lineSpacing + lineSpacing * 0.72 + glyph.yJitter * 1.5;
 
               const impressions = [...glyph.history, glyph.char];
@@ -243,7 +252,7 @@ export class PaperTexture {
                 const dx = isFinal ? 0 : (index % 2 === 0 ? 0.9 : -0.8) * (1 + index * 0.4);
                 const dy = isFinal ? 0 : (index % 2 === 0 ? -0.8 : 0.9) * (1 + index * 0.4);
 
-                ctx.font = `bold ${this.fontSizePx}px "${this.fontFamily}", "Courier Prime", monospace`;
+                ctx.font = `bold ${fontSize}px "${fontFamily}", "Courier Prime", monospace`;
                 ctx.textBaseline = "alphabetic";
                 ctx.textAlign = "left";
 

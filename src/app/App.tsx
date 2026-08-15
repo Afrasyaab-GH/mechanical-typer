@@ -78,6 +78,12 @@ export default function App() {
 
     if (loadDraft()) state.setDraftExists(true);
     core.paper.setFeedMode(state.feedMode);
+    core.manuscript.setTypeStyle(
+      state.typewriterFont,
+      state.typewriterFontSize,
+      state.typewriterLetterSpacing,
+      state.typewriterLineSpacing,
+    );
 
     const offStoreSubscriptions = useStore.subscribe((current, previous) => {
       if (current.unicodeAdapter && !previous.unicodeAdapter) input.focusIme();
@@ -93,6 +99,12 @@ export default function App() {
         current.typewriterLetterSpacing !== previous.typewriterLetterSpacing ||
         current.typewriterLineSpacing !== previous.typewriterLineSpacing
       ) {
+        core.manuscript.setTypeStyle(
+          current.typewriterFont,
+          current.typewriterFontSize,
+          current.typewriterLetterSpacing,
+          current.typewriterLineSpacing,
+        );
         core.paper.setFont(
           current.typewriterFont,
           current.typewriterFontSize,

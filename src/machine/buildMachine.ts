@@ -1504,8 +1504,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   );
   refs.ribbonSideL = makeRibbonSide();
   refs.ribbonSideR = makeRibbonSide();
-  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.1, -1.20);
-  refs.ribbonTipR = new THREE.Vector3(0.85, 13.1, -1.20);
+  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.65, -1.12);
+  refs.ribbonTipR = new THREE.Vector3(0.85, 13.65, -1.12);
 
   addPart(
     root,

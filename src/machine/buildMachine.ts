@@ -916,22 +916,23 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         const inner = new THREE.Group();
         group.add(inner);
 
-        // Main transverse curved universal bail bar
-        const bar = boxMesh(17.6, 0.35, 0.45, mats.nickel);
-        bar.position.set(0, 10.6, 0.5);
+        // Main transverse curved universal bail bar - Round, metallic, thin, moved up
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 17.6, 16), mats.nickel);
+        bar.rotation.z = Math.PI / 2;
+        bar.position.set(0, 10.9, 0.5);
         bar.castShadow = true;
         inner.add(bar);
 
         // Sublever contact comb/flange plate along lower edge
         const comb = boxMesh(16.8, 0.18, 0.75, mats.steelDark);
-        comb.position.set(0, 10.45, 0.65);
+        comb.position.set(0, 10.75, 0.65);
         inner.add(comb);
 
         // Left and Right swing pivot arms (bellcranks) reaching down to chassis pivots
         for (const side of [-1, 1]) {
           const arm = rodBetween(
             new THREE.Vector3(side * 8.8, 7.2, 1.2),
-            new THREE.Vector3(side * 8.7, 10.6, 0.5),
+            new THREE.Vector3(side * 8.7, 10.9, 0.5),
             0.18,
             mats.steelDark,
           );
@@ -940,16 +941,16 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
         // Center rear trip linkage / pushrod connecting universal bar to escapement rocker
         const tripPushrod = rodBetween(
-          new THREE.Vector3(0, 10.6, 0.5),
-          new THREE.Vector3(0, 10.75, -2.4),
-          0.14,
+          new THREE.Vector3(0, 10.9, 0.5),
+          new THREE.Vector3(0, 10.9, -2.4),
+          0.12,
           mats.nickel,
         );
         inner.add(tripPushrod);
 
         // Clevis link coupling head at the escapement rocker end
-        const clevis = boxMesh(0.4, 0.4, 0.6, mats.steelDark);
-        clevis.position.set(0, 10.75, -2.4);
+        const clevis = boxMesh(0.3, 0.3, 0.5, mats.steelDark);
+        clevis.position.set(0, 10.9, -2.4);
         inner.add(clevis);
 
         return inner;
@@ -988,18 +989,19 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         }
 
         const inner = new THREE.Group();
+        inner.position.set(0, 11.7, 0);
         group.add(inner);
 
         // Hardened steel escapement shaft / arbor spanning from carriage pinion to front bearing
         const arbor = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 16), mats.steelDark);
         arbor.rotation.x = Math.PI / 2;
-        arbor.position.set(0, 11.7, -3.0);
+        arbor.position.set(0, 0, -3.0);
         inner.add(arbor);
 
         // Hardened steel pinion gear meshing directly with the Carriage Gear Rack at z = -3.7, y = 12.18
         const pinionHub = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.38, 16), mats.steelDark);
         pinionHub.rotation.x = Math.PI / 2;
-        pinionHub.position.set(0, 11.7, -3.7);
+        pinionHub.position.set(0, 0, -3.7);
         inner.add(pinionHub);
         for (let i = 0; i < 10; i++) {
           const tooth = boxMesh(0.14, 0.28, 0.36, mats.steelDark);
@@ -1012,13 +1014,13 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         // Star wheel hub collar with locking set screw
         const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.22, 14), mats.brass);
         collar.rotation.x = Math.PI / 2;
-        collar.position.set(0, 11.7, -2.55);
+        collar.position.set(0, 0, -2.55);
         inner.add(collar);
 
         // Escapement brass ratchet star wheel with 15 undercut teeth
         const starWheelBody = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.24, 24), mats.brass);
         starWheelBody.rotation.x = Math.PI / 2;
-        starWheelBody.position.set(0, 11.7, -2.7);
+        starWheelBody.position.set(0, 0, -2.7);
         inner.add(starWheelBody);
 
         for (let i = 0; i < 15; i++) {

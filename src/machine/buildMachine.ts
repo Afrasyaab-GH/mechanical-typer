@@ -1407,8 +1407,9 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   /* ------------------------------- Ribbon ------------------------------- */
 
-  const SPOOL_Y = 13.2;
-  const SPOOL_X = 7.6;
+  const SPOOL_Y = 13.25;
+  const SPOOL_X = 8.0;
+  const SPOOL_Z = 0.5;
   for (const side of [-1, 1]) {
     const { action } = addPart(
       root,
@@ -1423,19 +1424,22 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["ribbon.strip"],
       },
       (group) => {
-        group.position.set(side * SPOOL_X, SPOOL_Y, -1.35);
+        group.position.set(side * SPOOL_X, SPOOL_Y, SPOOL_Z);
         const inner = new THREE.Group();
         group.add(inner);
         const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.42, 28), mats.ribbon);
         ribbon.castShadow = true;
         inner.add(ribbon);
         for (const y of [-0.3, 0.3]) {
-          const flange = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.08, 28), mats.steelDark);
+          const flange = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.08, 28), mats.steelDark);
           flange.position.y = y;
           inner.add(flange);
         }
-        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1, 10), mats.nickel);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1, 10), mats.nickel);
         inner.add(hub);
+        const topNut = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.22, 16), mats.nickel);
+        topNut.position.y = 0.42;
+        inner.add(topNut);
         return inner;
       },
     );
@@ -1457,19 +1461,19 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["paper.sheet"],
       },
       (group) => {
-        group.position.set(0, 13.0, -1.52);
+        group.position.set(0, 13.1, -1.36);
         const inner = new THREE.Group();
         group.add(inner);
         const frame = boxMesh(1.8, 1.4, 0.12, mats.nickel);
         frame.position.y = 0.55;
         inner.add(frame);
         const armL = boxMesh(0.18, 1.1, 0.16, mats.nickel);
-        armL.position.set(-0.8, 0, 0);
+        armL.position.set(-0.85, 0, 0);
         inner.add(armL);
         const armR = boxMesh(0.18, 1.1, 0.16, mats.nickel);
-        armR.position.set(0.8, 0, 0);
+        armR.position.set(0.85, 0, 0);
         inner.add(armR);
-        const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.55), mats.ribbon);
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.55), mats.ribbon);
         strip.position.set(0, 0.55, 0.08);
         inner.add(strip);
         return inner;
@@ -1500,8 +1504,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   );
   refs.ribbonSideL = makeRibbonSide();
   refs.ribbonSideR = makeRibbonSide();
-  refs.ribbonTipL = new THREE.Vector3(-0.8, 13.0, -1.52);
-  refs.ribbonTipR = new THREE.Vector3(0.8, 13.0, -1.52);
+  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.1, -1.36);
+  refs.ribbonTipR = new THREE.Vector3(0.85, 13.1, -1.36);
 
   addPart(
     root,
@@ -1516,7 +1520,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       downstream: ["ribbon.spoolR"],
     },
     (group) => {
-      group.position.set(4.6, 12, -1.3);
+      group.position.set(5.0, 12, 0.3);
       const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.3, 14), mats.brass);
       group.add(gear);
       for (let i = 0; i < 10; i++) {
@@ -1542,7 +1546,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       downstream: ["ribbon.advance"],
     },
     (group) => {
-      group.position.set(-4.6, 12, -1.3);
+      group.position.set(-5.0, 12, 0.3);
       const pawl = boxMesh(0.22, 1.6, 0.24, mats.steelDark);
       pawl.rotation.z = -0.4;
       group.add(pawl);
@@ -1691,8 +1695,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         group.add(deck);
 
         // Circular spool bezel ring
-        const bezel = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.2, 28), mats.nickel);
-        bezel.position.set(side * -7.0, 0.35, -0.35);
+        const bezel = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, 0.2, 28), mats.nickel);
+        bezel.position.set(side * -6.6, 0.35, 1.5);
         group.add(bezel);
         return null;
       },

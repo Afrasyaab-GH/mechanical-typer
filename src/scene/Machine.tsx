@@ -195,10 +195,10 @@ export function Machine() {
     // --- Ribbon path ---
     const tipL = build.refs.ribbonTipL;
     const tipR = build.refs.ribbonTipR;
-    tipL.set(-0.8, 13.0 + lift * 0.65, -1.52 - lift * 0.12);
-    tipR.set(0.8, 13.0 + lift * 0.65, -1.52 - lift * 0.12);
-    layRibbonSegment(build.refs.ribbonSideL, new THREE.Vector3(-6.1, 13.0, -1.45), tipL);
-    layRibbonSegment(build.refs.ribbonSideR, tipR, new THREE.Vector3(6.1, 13.0, -1.45));
+    tipL.set(-0.85, 13.1 + lift * 0.65, -1.36 - lift * 0.08);
+    tipR.set(0.85, 13.1 + lift * 0.65, -1.36 - lift * 0.08);
+    layRibbonSegment(build.refs.ribbonSideL, new THREE.Vector3(-6.6, 13.1, 0.4), tipL);
+    layRibbonSegment(build.refs.ribbonSideR, tipR, new THREE.Vector3(6.6, 13.1, 0.4));
 
     // --- Upper return guide visibility toggle according to feedMode ---
     if (build.refs.topGuide) {

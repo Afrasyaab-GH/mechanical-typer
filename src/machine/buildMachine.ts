@@ -10,11 +10,11 @@ import { PAPER } from "./constants";
 
 const KEY_SPACING = 1.9;
 const ROW_POS = [
-  { z: 2.4, y: 8.7 },
-  { z: 4.35, y: 8 },
-  { z: 6.3, y: 7.4 },
-  { z: 8.25, y: 6.85 },
-  { z: 10.3, y: 6.3 },
+  { z: 5.4, y: 8.6 },
+  { z: 7.35, y: 7.95 },
+  { z: 9.3, y: 7.35 },
+  { z: 11.25, y: 6.75 },
+  { z: 13.3, y: 6.15 },
 ];
 const KEY_CENTER_COL = 7.4;
 const PRINT_POINT = new THREE.Vector3(0, 14.6, -1.46);
@@ -1572,14 +1572,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       group.position.set(0, 4.8, 0);
 
       // Heavy contoured base chassis pan
-      const basePan = boxMesh(43.5, 2.6, 26.5, mats.enamel);
+      const basePan = boxMesh(43.5, 2.6, 31.5, mats.enamel);
+      basePan.position.set(0, 0, 1.8);
       basePan.castShadow = true;
       basePan.receiveShadow = true;
       group.add(basePan);
 
       // Recessed stepped keyboard floor tray
-      const tray = boxMesh(38.5, 1.2, 12, mats.enamelPanel);
-      tray.position.set(0, 1.2, 6.5);
+      const tray = boxMesh(38.5, 1.2, 14.8, mats.enamelPanel);
+      tray.position.set(0, 1.2, 9.6);
       tray.castShadow = true;
       group.add(tray);
 
@@ -1604,15 +1605,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 21.4, 8.8, 0);
+        group.position.set(side * 21.4, 8.8, 1.8);
 
         // Die-cast contoured cheek panel
-        const panel = boxMesh(1.2, 8.6, 25.8, mats.enamelPanel);
+        const panel = boxMesh(1.2, 8.6, 30.8, mats.enamelPanel);
         panel.castShadow = true;
         group.add(panel);
 
         // Polished nickel accent trim strip
-        const trim = boxMesh(0.2, 0.35, 24.5, mats.nickel);
+        const trim = boxMesh(0.2, 0.35, 29.5, mats.nickel);
         trim.position.set(side * 0.65, 3.8, 0);
         group.add(trim);
         return null;
@@ -1652,7 +1653,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 7.8, 12.8);
+      group.position.set(0, 7.5, 15.8);
 
       // Bevelled front apron
       const brow = boxMesh(41.5, 3.6, 1.2, mats.enamelPanel);
@@ -1729,8 +1730,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   for (const [x, z] of [
     [-18.5, -10.5],
     [18.5, -10.5],
-    [-18.5, 10.5],
-    [18.5, 10.5],
+    [-18.5, 14.5],
+    [18.5, 14.5],
   ] as const) {
     addPart(
       root,

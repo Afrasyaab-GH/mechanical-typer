@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { MachineMaterials } from "../scene/Materials";
 import type { PaperTexture } from "../document/PaperTexture";
 import { IME_TYPEBAR, KEYS, TYPEBAR_COUNT, type KeyDef } from "./keyboardLayout";
+import { PAPER } from "./constants";
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -397,9 +398,6 @@ function buildPaperMesh(paper: PaperTexture): {
   const L3 = Math.sqrt(dy3 * dy3 + dz3 * dz3);
   const L4 = Math.PI * loopParams.platenRadius;
   const loopTotalLength = L1 + L2 + L3 + L4;
-  const LINE_FEED_3D_LOOP = loopTotalLength / SCROLL_LOOP_LINES; // Exact 3D units per line in scroll mode
-  const LINE_FEED_3D_SHEET = (67.0 / 3508.0) * sheetLength;     // Sheet mode line feed
-  void LINE_FEED_3D_LOOP;
 
   let currentMode: "sheet" | "scroll" = "scroll";
   let currentLine = 0;
@@ -413,8 +411,11 @@ function buildPaperMesh(paper: PaperTexture): {
     let ptr = 0;
 
     if (currentMode === "sheet") {
-      const initialProtrusion = 2.6;
-      const sTop = sArcEnd + initialProtrusion + currentLine * LINE_FEED_3D_SHEET;
+      const lineHeightPx = paper.lineHeight;
+      const sTop =
+        sArcEnd +
+        ((PAPER.MARGIN_TOP + currentLine * lineHeightPx + lineHeightPx * 0.76) / PAPER.H) * sheetLength;
+
       for (let row = 0; row <= rows; row++) {
         const v = row / rows;
         const s = sTop - v * sheetLength;
@@ -431,9 +432,10 @@ function buildPaperMesh(paper: PaperTexture): {
       }
     } else {
       // SCROLL MODE: Continuous conveyor ribbon
-      // The strike horizon (sStation = 0) is locked to the active typing line
+      // Dynamic line capacity around the loop matching paper.lineHeight
+      const scrollLoopLines = Math.max(20, Math.round(PAPER.H / paper.lineHeight));
       const BASE_TEXT_PHASE = 0.72; // Optical baseline alignment with ribbon vibrator
-      const scrollPhase = (currentLine + BASE_TEXT_PHASE) / SCROLL_LOOP_LINES;
+      const scrollPhase = (currentLine + BASE_TEXT_PHASE) / scrollLoopLines;
 
       for (let row = 0; row <= rows; row++) {
         const v = row / rows; // 0.0 to 1.0 around the loop

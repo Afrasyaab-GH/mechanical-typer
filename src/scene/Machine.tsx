@@ -212,7 +212,7 @@ export function Machine() {
     // --- Paper scroll easing ---
     const activeGlobalLine =
       state.feedMode === "scroll"
-        ? manuscript.cursor.page * 44 + manuscript.cursor.line
+        ? manuscript.cursor.page * manuscript.maxLines + manuscript.cursor.line
         : manuscript.cursor.line;
     paperLineRef.current += (activeGlobalLine - paperLineRef.current) * Math.min(1, deltaMs / 90);
     if (Math.abs(paperLineRef.current - activeGlobalLine) < 0.002) paperLineRef.current = activeGlobalLine;

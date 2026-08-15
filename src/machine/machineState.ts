@@ -96,7 +96,12 @@ export class MachineState {
   private bellFlashUntil = 0;
   escapeWheelTarget = 0;
   private platenBase = 0;
-  platenStep = 0.28;
+
+  get platenStep(): number {
+    const lineHeight = this.manuscript.activeLineHeight;
+    // 29.7cm sheet length, 3508px A4 height, 1.90cm platen radius
+    return (lineHeight / 3508.0) * (29.7 / 1.90);
+  }
 
   constructor(manuscript?: Manuscript) {
     this.manuscript = manuscript ?? new Manuscript();
@@ -363,8 +368,8 @@ export class MachineState {
         const result = this.manuscript.apply({ type: "CARRIAGE_RETURN", timestamp: this.now });
         this.carriageTarget = LEFT_COL;
         this.carriageCols = LEFT_COL;
-        this.platenBase += this.platenStep;
-        if (result.blockedByPageFull) this.platenBase -= this.platenStep;
+        this.platenBase = this.manuscript.cursor.line * this.platenStep;
+        if (result.blockedByPageFull) this.platenBase = (this.manuscript.maxLines - 1) * this.platenStep;
       }
       if (progress >= 1) {
         this.returnLeverPull = 0;
@@ -432,7 +437,7 @@ export class MachineState {
       actor.applied = result.accepted;
       if (result.accepted) {
         if (result.autoReturned) {
-          this.platenBase += this.platenStep;
+          this.platenBase = this.manuscript.cursor.line * this.platenStep;
           this.platenRotation = this.platenBase;
           this.carriageTarget = 0;
           this.carriageAnim = { from: this.carriageCols, to: 0, start: this.now, dur: 180 };
@@ -455,7 +460,7 @@ export class MachineState {
       actor.applied = result.accepted;
       if (result.accepted) {
         if (result.autoReturned) {
-          this.platenBase += this.platenStep;
+          this.platenBase = this.manuscript.cursor.line * this.platenStep;
           this.platenRotation = this.platenBase;
           this.carriageTarget = 0;
           this.carriageAnim = { from: this.carriageCols, to: 0, start: this.now, dur: 180 };

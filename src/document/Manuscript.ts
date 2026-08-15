@@ -459,11 +459,12 @@ export class Manuscript {
 
   scrollLines(delta: number): void {
     // Moves cursor.line up or down across pages
-    const totalLines = this.pages.length * LINES;
-    let currentGlobal = this.cursor.page * LINES + this.cursor.line;
+    const linesPerPage = this.maxLines;
+    const totalLines = this.pages.length * linesPerPage;
+    let currentGlobal = this.cursor.page * linesPerPage + this.cursor.line;
     currentGlobal = Math.max(0, Math.min(totalLines - 1, currentGlobal + delta));
-    this.cursor.page = Math.floor(currentGlobal / LINES);
-    this.cursor.line = currentGlobal % LINES;
+    this.cursor.page = Math.floor(currentGlobal / linesPerPage);
+    this.cursor.line = currentGlobal % linesPerPage;
     this.bus.emit("changed", { page: this.cursor.page });
     this.bus.emit("structure", {});
   }

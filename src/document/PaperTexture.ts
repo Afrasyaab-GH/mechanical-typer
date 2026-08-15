@@ -226,17 +226,17 @@ export class PaperTexture {
       }
     } else {
       // CONTINUOUS SCROLL MODE:
-      // 48 lines fill the exact 0..1 UV canvas height
-      const SCROLL_LOOP_LINES = 48;
-      const lineSpacing = (this.canvas.height / SCROLL_LOOP_LINES) * this.lineSpacingMultiplier;
-      const minVisibleLine = Math.max(0, currentGlobalLine - SCROLL_LOOP_LINES + 3);
+      // Dynamic loop line count matching 3D loop conveyor
+      const scrollLoopLines = Math.max(20, Math.round(this.canvas.height / this.lineHeight));
+      const lineSpacing = this.canvas.height / scrollLoopLines;
+      const minVisibleLine = Math.max(0, currentGlobalLine - scrollLoopLines + 3);
 
       for (let p = 0; p < this.manuscript.pages.length; p++) {
         const pageRows = this.manuscript.pages[p] ?? [];
         for (let l = 0; l < pageRows.length; l++) {
-          const gLine = p * 44 + l;
+          const gLine = p * this.manuscript.maxLines + l;
           if (gLine >= minVisibleLine && gLine <= currentGlobalLine) {
-            const cyclicLine = ((gLine % SCROLL_LOOP_LINES) + SCROLL_LOOP_LINES) % SCROLL_LOOP_LINES;
+            const cyclicLine = ((gLine % scrollLoopLines) + scrollLoopLines) % scrollLoopLines;
             for (const glyph of pageRows[l]) {
               const fontSize = glyph.fontSize ?? this.fontSizePx;
               const fontFamily = glyph.fontFamily ?? this.fontFamily;

@@ -168,6 +168,49 @@ function boxMesh(w: number, h: number, d: number, material: THREE.Material): THR
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
 }
 
+/** Dynamic multi-segment ribbon strip mesh that supports real-time spline deformation and realistic cloth waviness. */
+export function createDynamicRibbonMesh(material: THREE.Material, segments = 32): THREE.Mesh {
+  const geom = new THREE.BufferGeometry();
+  const vertexCount = (segments + 1) * 2;
+  const positions = new Float32Array(vertexCount * 3);
+  const normals = new Float32Array(vertexCount * 3);
+  const uvs = new Float32Array(vertexCount * 2);
+  const indices = new Uint16Array(segments * 6);
+
+  let idx = 0;
+  for (let i = 0; i < segments; i++) {
+    const v0 = i * 2;
+    const v1 = i * 2 + 1;
+    const v2 = (i + 1) * 2;
+    const v3 = (i + 1) * 2 + 1;
+
+    indices[idx++] = v0;
+    indices[idx++] = v1;
+    indices[idx++] = v2;
+
+    indices[idx++] = v2;
+    indices[idx++] = v1;
+    indices[idx++] = v3;
+  }
+
+  for (let i = 0; i <= segments; i++) {
+    const u = i / segments;
+    uvs[i * 4] = u;
+    uvs[i * 4 + 1] = 1;
+    uvs[i * 4 + 2] = u;
+    uvs[i * 4 + 3] = 0;
+  }
+
+  geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geom.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geom.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geom.setIndex(new THREE.BufferAttribute(indices, 1));
+
+  const mesh = new THREE.Mesh(geom, material);
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
 /* ------------------------------------------------------------------ */
 /* Part registry types                                                 */
 /* ------------------------------------------------------------------ */
@@ -1642,9 +1685,20 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         group.position.set(side * SPOOL_X, SPOOL_Y, SPOOL_Z);
         const inner = new THREE.Group();
         group.add(inner);
-        const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.42, 28), mats.ribbon);
-        ribbon.castShadow = true;
-        inner.add(ribbon);
+
+        // Core cylindrical wound ribbon pack
+        const ribbonCore = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.05, 0.44, 28), mats.ribbon);
+        ribbonCore.castShadow = true;
+        inner.add(ribbonCore);
+
+        // Outer wound ribbon layer visibly wrapping the spool perimeter
+        const wrapAngle = Math.PI * 1.55;
+        const outerWrap = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.08, 2.08, 0.50, 32, 1, true, side < 0 ? 0 : -Math.PI * 0.55, wrapAngle),
+          mats.ribbon,
+        );
+        inner.add(outerWrap);
+
         for (const y of [-0.3, 0.3]) {
           const flange = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.08, 28), mats.steelDark);
           flange.position.y = y;
@@ -1655,6 +1709,18 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         const topNut = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.22, 16), mats.nickel);
         topNut.position.y = 0.42;
         inner.add(topNut);
+
+        // Deck guide post / tension roller guiding ribbon off the spool
+        const guidePost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.75, 14), mats.nickel);
+        guidePost.position.set(side * -2.15, 0, 0.05);
+        group.add(guidePost);
+
+        for (const y of [-0.32, 0.32]) {
+          const guideFlange = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 14), mats.steelDark);
+          guideFlange.position.set(side * -2.15, y, 0.05);
+          group.add(guideFlange);
+        }
+
         return inner;
       },
     );
@@ -1676,20 +1742,81 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["paper.sheet"],
       },
       (group) => {
-        group.position.set(0, 13.1, -1.20);
+        group.position.set(0, 13.1, -1.36);
         const inner = new THREE.Group();
         group.add(inner);
-        const frame = boxMesh(1.8, 1.4, 0.12, mats.nickel);
-        frame.position.y = 0.55;
-        inner.add(frame);
-        const armL = boxMesh(0.18, 1.1, 0.16, mats.nickel);
-        armL.position.set(-0.85, 0, 0);
-        inner.add(armL);
-        const armR = boxMesh(0.18, 1.1, 0.16, mats.nickel);
-        armR.position.set(0.85, 0, 0);
-        inner.add(armR);
-        const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.55), mats.ribbon);
-        strip.position.set(0, 0.55, 0.08);
+
+        // Polished nickel ribbon vibrator carrier with gracefully curved top corners and beveled edges
+        const shape = new THREE.Shape();
+        const sw = 0.20; // stem half-width
+        const stemB = -0.70; // stem bottom sliding in anvil guide
+        const stemT = 0.15; // stem top transition
+
+        // Start at bottom stem
+        shape.moveTo(-sw, stemB);
+        shape.lineTo(sw, stemB);
+        shape.lineTo(sw, stemT);
+
+        // Right ear flare outward and upward
+        shape.quadraticCurveTo(0.42, 0.38, 0.90, 0.68);
+        shape.lineTo(1.00, 1.10);
+
+        // TOP RIGHT CORNER: Gracefully curved arc (curved top corner)
+        shape.quadraticCurveTo(1.00, 1.40, 0.72, 1.40);
+
+        // Top right inner curl dropping towards strike aperture
+        shape.quadraticCurveTo(0.50, 1.40, 0.40, 1.05);
+
+        // Strike Window: Smooth U-notch cutout so type slugs hit cleanly
+        shape.quadraticCurveTo(0.30, 0.46, 0.0, 0.46);
+        shape.quadraticCurveTo(-0.30, 0.46, -0.40, 1.05);
+
+        // Top left inner curl rising to top left
+        shape.quadraticCurveTo(-0.50, 1.40, -0.72, 1.40);
+
+        // TOP LEFT CORNER: Gracefully curved arc (curved top corner)
+        shape.quadraticCurveTo(-1.00, 1.40, -1.00, 1.10);
+
+        // Left ear flare inward to stem
+        shape.lineTo(-0.90, 0.68);
+        shape.quadraticCurveTo(-0.42, 0.38, -sw, stemT);
+        shape.lineTo(-sw, stemB);
+
+        const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+          steps: 1,
+          depth: 0.07,
+          bevelEnabled: true,
+          bevelThickness: 0.02,
+          bevelSize: 0.02,
+          bevelSegments: 3,
+        };
+
+        const vibratorCarrierGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        vibratorCarrierGeo.center();
+        const vibratorCarrier = new THREE.Mesh(vibratorCarrierGeo, mats.nickel);
+        vibratorCarrier.position.set(0, 0.40, 0);
+        inner.add(vibratorCarrier);
+
+        // Curved ribbon retention guide loops on left and right wings
+        for (const side of [-1, 1]) {
+          const guideLoop = new THREE.Mesh(
+            new THREE.TorusGeometry(0.16, 0.032, 10, 16, Math.PI * 1.15),
+            mats.nickel,
+          );
+          guideLoop.rotation.y = Math.PI / 2;
+          guideLoop.rotation.z = side > 0 ? 0.3 : -0.3;
+          guideLoop.position.set(side * 0.86, 0.55, 0.02);
+          inner.add(guideLoop);
+        }
+
+        // Lower ribbon shelf support
+        const shelf = boxMesh(1.85, 0.06, 0.12, mats.nickel);
+        shelf.position.set(0, 0.28, 0.02);
+        inner.add(shelf);
+
+        // Center ribbon section resting inside the vibrator guide slot
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.52), mats.ribbon);
+        strip.position.set(0, 0.55, 0.02);
         inner.add(strip);
         return inner;
       },
@@ -1697,12 +1824,14 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     refs.vibratorAction = action!;
   }
 
-  const makeRibbonSide = (): THREE.Mesh => {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.55), mats.ribbon);
-    mesh.userData.partId = "ribbon.strip";
-    root.add(mesh);
-    return mesh;
-  };
+  refs.ribbonSideL = createDynamicRibbonMesh(mats.ribbon, 32);
+  refs.ribbonSideL.userData.partId = "ribbon.strip";
+  root.add(refs.ribbonSideL);
+
+  refs.ribbonSideR = createDynamicRibbonMesh(mats.ribbon, 32);
+  refs.ribbonSideR.userData.partId = "ribbon.strip";
+  root.add(refs.ribbonSideR);
+
   addPart(
     root,
     {
@@ -1717,10 +1846,9 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     },
     () => null,
   );
-  refs.ribbonSideL = makeRibbonSide();
-  refs.ribbonSideR = makeRibbonSide();
-  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.65, -1.12);
-  refs.ribbonTipR = new THREE.Vector3(0.85, 13.65, -1.12);
+
+  refs.ribbonTipL = new THREE.Vector3(-0.85, 13.65, -1.36);
+  refs.ribbonTipR = new THREE.Vector3(0.85, 13.65, -1.36);
 
   addPart(
     root,

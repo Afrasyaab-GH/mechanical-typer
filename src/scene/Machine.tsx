@@ -31,13 +31,72 @@ function lerpPose(from: Pose, to: Pose, t: number): Pose {
   };
 }
 
-/** Stretch a plane ribbon segment between two points standing vertically on the Y axis. */
-function layRibbonSegment(mesh: THREE.Mesh, from: THREE.Vector3, to: THREE.Vector3): void {
-  const direction = to.clone().sub(from);
-  const length = direction.length();
-  mesh.position.copy(from).addScaledVector(direction, 0.5);
-  mesh.scale.set(length, 1, 1);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize());
+const tempVecA = new THREE.Vector3();
+const tempVecB = new THREE.Vector3();
+
+/** Dynamic parametric ribbon spline calculation that treats ink ribbon like real flexible woven fabric with natural drape & subtle waviness. */
+function updateWavyRibbon(
+  mesh: THREE.Mesh,
+  points: THREE.Vector3[],
+  height = 0.52,
+  sideSign = 1,
+): void {
+  const geom = mesh.geometry as THREE.BufferGeometry;
+  const posAttr = geom.attributes?.position as THREE.BufferAttribute;
+  if (!posAttr) return;
+
+  const positions = posAttr.array as Float32Array;
+  const segments = (posAttr.count / 2) - 1;
+  if (segments < 2) return;
+
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
+  const halfH = height * 0.5;
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = curve.getPoint(t, tempVecA);
+    const tangent = curve.getTangent(t, tempVecB);
+
+    // Horizontal ribbon normal
+    const normX = -tangent.z;
+    const normZ = tangent.x;
+    const len = Math.hypot(normX, normZ) || 1;
+    const nx = normX / len;
+    const nz = normZ / len;
+
+    // Up vector orthogonal to tangent and normal
+    const ux = -nz * tangent.y;
+    const uy = nz * tangent.x - nx * tangent.z;
+    const uz = nx * tangent.y;
+    const ulen = Math.hypot(ux, uy, uz) || 1;
+    const upX = ux / ulen;
+    const upY = uy / ulen;
+    const upZ = uz / ulen;
+
+    // Natural woven fabric micro-wave and catenary sag (clamped smoothly to 0 at ends)
+    const envelope = Math.sin(t * Math.PI);
+    const microWave = Math.sin(t * Math.PI * 3.5 + sideSign * 1.6) * 0.025 * envelope;
+    const sag = -0.035 * envelope;
+
+    const px = p.x + nx * microWave;
+    const py = p.y + sag;
+    const pz = p.z + nz * microWave;
+
+    // Top vertex
+    const idx0 = i * 2 * 3;
+    positions[idx0] = px + upX * halfH;
+    positions[idx0 + 1] = py + upY * halfH;
+    positions[idx0 + 2] = pz + upZ * halfH;
+
+    // Bottom vertex
+    const idx1 = (i * 2 + 1) * 3;
+    positions[idx1] = px - upX * halfH;
+    positions[idx1 + 1] = py - upY * halfH;
+    positions[idx1 + 2] = pz - upZ * halfH;
+  }
+
+  posAttr.needsUpdate = true;
+  geom.computeVertexNormals();
 }
 
 export function Machine() {
@@ -203,10 +262,22 @@ export function Machine() {
     // --- Ribbon path ---
     const tipL = build.refs.ribbonTipL;
     const tipR = build.refs.ribbonTipR;
-    tipL.set(-0.85, 13.65 + lift * 0.65, -1.62 - lift * 0.08);
-    tipR.set(0.85, 13.65 + lift * 0.65, -1.62 - lift * 0.08);
-    layRibbonSegment(build.refs.ribbonSideL, new THREE.Vector3(-6.6, 13.35, 0.4), tipL);
-    layRibbonSegment(build.refs.ribbonSideR, tipR, new THREE.Vector3(6.6, 13.35, 0.4));
+    tipL.set(-0.85, 13.65 + lift * 0.65, -1.36 - lift * 0.08);
+    tipR.set(0.85, 13.65 + lift * 0.65, -1.36 - lift * 0.08);
+
+    // Left ribbon path: wraps around left spool, passes guide post, sweeps across basket with natural cloth drape into vibrator
+    const pSpoolL = new THREE.Vector3(-6.15, 13.25, 0.55);
+    const pGuideL = new THREE.Vector3(-5.80, 13.25, 0.40);
+    const pMidL = new THREE.Vector3(-3.50, 13.38, -0.42);
+    const pNearL = new THREE.Vector3(-1.60, 13.52, -1.02);
+    updateWavyRibbon(build.refs.ribbonSideL, [pSpoolL, pGuideL, pMidL, pNearL, tipL], 0.52, -1);
+
+    // Right ribbon path: leaves vibrator, sweeps across basket with natural cloth drape, passes guide post, wraps around right spool
+    const pNearR = new THREE.Vector3(1.60, 13.52, -1.02);
+    const pMidR = new THREE.Vector3(3.50, 13.38, -0.42);
+    const pGuideR = new THREE.Vector3(5.80, 13.25, 0.40);
+    const pSpoolR = new THREE.Vector3(6.15, 13.25, 0.55);
+    updateWavyRibbon(build.refs.ribbonSideR, [tipR, pNearR, pMidR, pGuideR, pSpoolR], 0.52, 1);
 
     // --- Upper return guide visibility toggle according to feedMode ---
     if (build.refs.topGuide) {

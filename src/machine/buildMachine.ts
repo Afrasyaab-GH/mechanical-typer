@@ -942,7 +942,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         // Center rear trip linkage / pushrod connecting universal bar to escapement rocker
         const tripPushrod = rodBetween(
           new THREE.Vector3(0, 10.9, 0.5),
-          new THREE.Vector3(0, 10.9, -2.4),
+          new THREE.Vector3(0, 11.1, -2.4),
           0.12,
           mats.nickel,
         );
@@ -950,7 +950,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
         // Clevis link coupling head at the escapement rocker end
         const clevis = boxMesh(0.3, 0.3, 0.5, mats.steelDark);
-        clevis.position.set(0, 10.9, -2.4);
+        clevis.position.set(0, 11.1, -2.4);
         inner.add(clevis);
 
         return inner;
@@ -1063,8 +1063,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         group.add(trunnionScrew);
       }
 
-      // Rocker body casting (Dog carrier)
-      const rockerCarrier = boxMesh(1.6, 1.8, 0.35, mats.steelDark);
+      // Thin vertical dog carrier frame (replacing the bulky square block)
+      const rockerCarrier = boxMesh(0.5, 1.8, 0.25, mats.steelDark);
       rockerCarrier.position.set(0, 11.1, -2.5);
       group.add(rockerCarrier);
 
@@ -1085,9 +1085,9 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       leafSpring.position.set(-0.62, 11.9, -3.0);
       group.add(leafSpring);
 
-      // Lower rocker trip horn receiving pushrod from Universal Bar
-      const lowerTripHorn = boxMesh(0.35, 0.95, 0.3, mats.steelDark);
-      lowerTripHorn.position.set(0, 10.3, -2.45);
+      // Rocker trip connection receiving pushrod from Universal Bar (moved upwards to 10.9)
+      const lowerTripHorn = boxMesh(0.4, 0.4, 0.3, mats.steelDark);
+      lowerTripHorn.position.set(0, 10.9, -2.45);
       group.add(lowerTripHorn);
 
       // Pivot pin coupling trip pushrod to lower horn
@@ -1738,66 +1738,66 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       // Transverse Ribbon Drive Cross-Shaft spanning under the deck between spools
       const driveShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 16.2, 16), mats.steelDark);
       driveShaft.rotation.z = Math.PI / 2;
-      driveShaft.position.set(0, 11.0, 0.5);
+      driveShaft.position.set(0, 11.0, -1.2);
       group.add(driveShaft);
 
       // Bearing pillow block brackets anchoring the cross-shaft to the chassis frame
       for (const xBracket of [-7.6, 0, 7.6]) {
         const pillowBlock = boxMesh(0.55, 1.2, 0.7, mats.steelDark);
-        pillowBlock.position.set(xBracket, 10.6, 0.5);
+        pillowBlock.position.set(xBracket, 10.6, -1.2);
         group.add(pillowBlock);
 
         const brassBushing = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.6, 12), mats.brass);
         brassBushing.rotation.z = Math.PI / 2;
-        brassBushing.position.set(xBracket, 11.0, 0.5);
+        brassBushing.position.set(xBracket, 11.0, -1.2);
         group.add(brassBushing);
       }
 
       // Right vertical spool spindle shaft connecting deck spool to cross-shaft
       const rightSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.2, 14), mats.steelDark);
-      rightSpoolSpindle.position.set(8.0, 12.0, 0.5);
+      rightSpoolSpindle.position.set(8.0, 12.0, -1.2);
       group.add(rightSpoolSpindle);
 
       // Right miter bevel gear pair transferring rotation to vertical spindle
       const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.2, 0.28, 14), mats.brass);
       miterGearH.rotation.z = Math.PI / 2;
-      miterGearH.position.set(7.7, 11.0, 0.5);
+      miterGearH.position.set(7.7, 11.0, -1.2);
       group.add(miterGearH);
 
       const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
-      miterGearV.position.set(8.0, 11.3, 0.5);
+      miterGearV.position.set(8.0, 11.3, -1.2);
       group.add(miterGearV);
 
       // Ribbon Advance Ratchet Wheel on cross shaft
       const ratchetWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 18), mats.brass);
       ratchetWheel.rotation.z = Math.PI / 2;
-      ratchetWheel.position.set(4.8, 11.0, 0.5);
+      ratchetWheel.position.set(4.8, 11.0, -1.2);
       group.add(ratchetWheel);
 
       for (let i = 0; i < 12; i++) {
         const tooth = boxMesh(0.28, 0.15, 0.24, mats.brass);
         const angle = (i / 12) * Math.PI * 2;
-        tooth.position.set(4.8, 11.0 + Math.cos(angle) * 0.92, 0.5 + Math.sin(angle) * 0.92);
+        tooth.position.set(4.8, 11.0 + Math.cos(angle) * 0.92, -1.2 + Math.sin(angle) * 0.92);
         tooth.rotation.x = angle + 0.25;
         group.add(tooth);
       }
 
       // Driving Pawl Actuator Rocker linked to universal bar motion
       const pawlRocker = boxMesh(0.24, 1.3, 0.38, mats.steelDark);
-      pawlRocker.position.set(5.15, 11.5, 0.5);
+      pawlRocker.position.set(5.15, 11.5, -1.2);
       pawlRocker.rotation.x = 0.32;
       group.add(pawlRocker);
 
       // Hardened steel driving pawl
       const drivePawl = boxMesh(0.16, 0.8, 0.18, mats.steelDark);
-      drivePawl.position.set(5.15, 11.9, 0.72);
+      drivePawl.position.set(5.15, 11.9, -0.98);
       drivePawl.rotation.x = -0.42;
       group.add(drivePawl);
 
       // Actuator link rod to universal bar
       const actRod = rodBetween(
-        new THREE.Vector3(4.5, 10.6, 0.5),
-        new THREE.Vector3(5.15, 11.1, 0.5),
+        new THREE.Vector3(4.5, 10.9, 0.5),
+        new THREE.Vector3(5.15, 11.1, -1.2),
         0.1,
         mats.steelDark,
       );
@@ -1805,7 +1805,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       // Anti-reverse retention click pawl
       const holdPawl = boxMesh(0.16, 0.65, 0.16, mats.steelDark);
-      holdPawl.position.set(4.8, 10.25, 0.92);
+      holdPawl.position.set(4.8, 10.25, -0.78);
       holdPawl.rotation.x = 0.48;
       group.add(holdPawl);
 

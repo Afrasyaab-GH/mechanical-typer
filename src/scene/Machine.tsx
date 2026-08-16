@@ -203,8 +203,8 @@ export function Machine() {
     // --- Ribbon path ---
     const tipL = build.refs.ribbonTipL;
     const tipR = build.refs.ribbonTipR;
-    tipL.set(-0.85, 13.65 + lift * 0.65, -1.12 - lift * 0.08);
-    tipR.set(0.85, 13.65 + lift * 0.65, -1.12 - lift * 0.08);
+    tipL.set(-0.85, 13.65 + lift * 0.65, -1.62 - lift * 0.08);
+    tipR.set(0.85, 13.65 + lift * 0.65, -1.62 - lift * 0.08);
     layRibbonSegment(build.refs.ribbonSideL, new THREE.Vector3(-6.6, 13.35, 0.4), tipL);
     layRibbonSegment(build.refs.ribbonSideR, tipR, new THREE.Vector3(6.6, 13.35, 0.4));
 

@@ -5,6 +5,7 @@ import { loadDraft, createDraftAutoSaver } from "../document/draftStorage";
 import { InputManager } from "../input/InputManager";
 import { TypewriterScene } from "../scene/TypewriterScene";
 import { Overlay } from "../ui/Overlay";
+import { Sidebar } from "../ui/Sidebar";
 
 function webglAvailable(): boolean {
   try {
@@ -137,9 +138,14 @@ export default function App() {
   if (!hasWebGL) return <WebGLFallback />;
 
   return (
-    <div className="app">
-      <TypewriterScene />
-      <Overlay manager={manager} />
+    <div id="root-layout" className="root-layout">
+      <Sidebar />
+      <main className="editor-view">
+        <div className="canvas-container">
+          <TypewriterScene />
+        </div>
+        <Overlay manager={manager} />
+      </main>
       <textarea
         ref={imeRef}
         className="ime-input"

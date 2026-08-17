@@ -14,6 +14,7 @@ import {
   createZeroWidthWatermarkString,
   stripZeroWidthCharacters,
 } from "../steganography/SteganographyEncoder";
+import { getKeystrokeLedger } from "../recorder/KeystrokeLedger";
 
 export type OverstrikeMode = "final" | "annotated";
 
@@ -288,11 +289,12 @@ export function docxFileName(date = new Date()): string {
 /** Builds the DOCX entirely in the browser. No network calls. */
 export async function buildDocx(manuscript: Manuscript, options: DocxOptions): Promise<DocxResult> {
   const fullCleanText = stripZeroWidthCharacters(manuscript.getText());
+  const ledgerMetrics = getKeystrokeLedger().getMetrics();
   const watermark = await createZeroWidthWatermarkString(fullCleanText, {
     author: options.author || undefined,
     title: options.title || undefined,
-    entropyScore: options.entropyScore,
-    keystrokeCount: options.keystrokeCount,
+    entropyScore: options.entropyScore ?? ledgerMetrics?.cadenceEntropyScore,
+    keystrokeCount: options.keystrokeCount ?? ledgerMetrics?.totalKeystrokes,
   });
 
   const document = buildDocument(manuscript, options, watermark);

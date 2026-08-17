@@ -1,0 +1,6 @@
+{
+  "name": "Platen: 3D Typewriter",
+  "description": "An interactive 3D mechanical typewriter with physical simulations, authentic sound synthesis, manuscript drafting, and steganographic proof of authorship.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

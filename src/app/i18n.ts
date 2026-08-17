@@ -22,7 +22,7 @@ const I18N: Record<string, string> = {
   "btn.newSheet": "NEW SHEET",
   "btn.undo": "UNDO",
   "btn.redo": "REDO",
-  "btn.export": "EXPORT DOCX",
+  "btn.export": "EXPORT",
   "btn.verify": "VERIFY",
   "btn.copyWatermarked": "COPY WITH INVISIBLE SEAL",
   "btn.clear": "CLEAR",

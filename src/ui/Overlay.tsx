@@ -9,8 +9,8 @@ import { ControlDesk } from "./ControlDesk";
 import { PartInfo } from "./PartInfo";
 import { ExportDrawer } from "./ExportDrawer";
 import { CustomizeDrawer } from "./CustomizeDrawer";
-
 import { VerifyDrawer } from "./VerifyDrawer";
+import { MainMenuModal } from "./MainMenuModal";
 
 export function Overlay({ manager }: { manager: InputManager | null }) {
   const state = useStore();
@@ -80,16 +80,29 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
 
   return (
     <div className="overlay">
-      <header className="hud-title">
-        <h1>PLATEN</h1>
-        <p className="subtitle">{t("subtitle")}</p>
-        <p className="tagline">{t("tagline1")}</p>
-      </header>
-
-      {/* Top-Right Vintage Video & Audio Proof of Authorship Recorder */}
-      <div className="hud-rec-container">
+      {/* Top-Left Corner: Menu Button & Clean Minimal Brand */}
+      <div className="top-left-actions">
         <button
-          className={`hud-btn hud-rec-btn ${recording ? "recording" : ""}`}
+          className={`hud-btn menu-trigger-btn ${state.sidebarOpen ? "active" : ""}`}
+          onClick={() => state.toggleSidebar()}
+          aria-label={state.sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={state.sidebarOpen}
+          title="Toggle Navigation Menu (ESC)"
+        >
+          <span className="menu-icon-bars">☰</span>
+          <span className="menu-btn-label">MENU</span>
+        </button>
+
+        <div className="hud-minimal-brand">
+          <span className="brand-name">PLATEN</span>
+          <span className="brand-ver">v.01</span>
+        </div>
+      </div>
+
+      {/* Top-Right HUD Actions matching design HTML */}
+      <div className="top-actions">
+        <button
+          className={`hud-btn btn-rec ${recording ? "recording" : ""}`}
           onClick={toggleRecording}
           aria-label={recording ? "Stop Recording Proof" : "Start Recording Proof"}
           title={
@@ -98,14 +111,30 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
               : "Record 60 FPS video with synchronized mechanical sound effects"
           }
         >
-          <span className="hud-rec-dot" />
-          <span className="hud-rec-label">{recording ? t("btn.stopRec") : t("btn.rec")}</span>
+          <span className="rec-dot" />
+          <span>{recording ? t("btn.stopRec") : t("btn.rec")}</span>
           {recording && (
             <span className="hud-rec-timer">
               {String(Math.floor(recordingDuration / 60)).padStart(2, "0")}:
               {String(recordingDuration % 60).padStart(2, "0")}
             </span>
           )}
+        </button>
+
+        <button
+          className="hud-btn"
+          onClick={() => state.setExportOpen(true)}
+          title="Export Manuscript as PDF, Markdown, Plain Text, or Crypto Proof"
+        >
+          Export
+        </button>
+
+        <button
+          className="hud-btn"
+          onClick={() => state.setVerifyOpen(true)}
+          title="Verify Cryptographic Keystroke Ledger"
+        >
+          Verify
         </button>
       </div>
 
@@ -173,8 +202,12 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
       <VerifyDrawer />
       <CustomizeDrawer />
       <ControlDesk />
+      <MainMenuModal />
 
-      <footer className="hud-footer">{t("footer")}</footer>
+      <footer className="hud-footer footer-meta">
+        Platen System [Secure Mode]<br />
+        Your writing never leaves this device.
+      </footer>
       <div className="sr-only" aria-live="polite" aria-label="Manuscript text">
         {core.manuscript.getText().replace(/\f/g, "\n\n— new sheet —\n\n")}
       </div>

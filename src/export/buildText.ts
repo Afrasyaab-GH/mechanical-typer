@@ -3,6 +3,7 @@ import {
   injectOwnershipWatermark,
   stripZeroWidthCharacters,
 } from "../steganography/SteganographyEncoder";
+import { getKeystrokeLedger } from "../recorder/KeystrokeLedger";
 
 export interface TextExportOptions {
   title: string;
@@ -53,11 +54,12 @@ export async function buildTextExport(
   }
 
   // Inject zero-width invisible cryptographic seal
+  const ledgerMetrics = getKeystrokeLedger().getMetrics();
   const sealedContent = await injectOwnershipWatermark(formattedContent, {
     author: options.author || undefined,
     title: options.title || undefined,
-    entropyScore: options.entropyScore,
-    keystrokeCount: options.keystrokeCount,
+    entropyScore: options.entropyScore ?? ledgerMetrics?.cadenceEntropyScore,
+    keystrokeCount: options.keystrokeCount ?? ledgerMetrics?.totalKeystrokes,
   });
 
   const mime = options.format === "md" ? "text/markdown;charset=utf-8" : "text/plain;charset=utf-8";

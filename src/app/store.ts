@@ -29,7 +29,12 @@ export interface ExportResult {
 }
 
 interface AppState {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+
   panelHidden: boolean;
+  setPanelHidden: (hidden: boolean) => void;
   togglePanel: () => void;
 
   cameraMode: CameraMode;
@@ -154,13 +159,26 @@ interface AppState {
   saveTick: number;
   bumpSaveTick: () => void;
 
+  mainMenuOpen: boolean;
+  setMainMenuOpen: (open: boolean) => void;
+  toggleMainMenu: () => void;
+  mainMenuTab: "library" | "editor" | "options" | "about";
+  setMainMenuTab: (tab: "library" | "editor" | "options" | "about") => void;
+  selectedProjectId: string | null;
+  setSelectedProjectId: (id: string | null) => void;
+
   motionReduced: boolean;
 }
 
 let plaqueTimer = 0;
 
 export const useStore = create<AppState>((set, get) => ({
-  panelHidden: false,
+  sidebarOpen: false,
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+  panelHidden: true,
+  setPanelHidden: (panelHidden) => set({ panelHidden }),
   togglePanel: () => set((s) => ({ panelHidden: !s.panelHidden })),
 
   cameraMode: "write",
@@ -315,6 +333,14 @@ export const useStore = create<AppState>((set, get) => ({
   setDraftExists: (draftExists) => set({ draftExists }),
   saveTick: 0,
   bumpSaveTick: () => set((s) => ({ saveTick: s.saveTick + 1 })),
+
+  mainMenuOpen: false,
+  setMainMenuOpen: (mainMenuOpen) => set({ mainMenuOpen }),
+  toggleMainMenu: () => set((s) => ({ mainMenuOpen: !s.mainMenuOpen })),
+  mainMenuTab: "library",
+  setMainMenuTab: (mainMenuTab) => set({ mainMenuTab }),
+  selectedProjectId: null,
+  setSelectedProjectId: (selectedProjectId) => set({ selectedProjectId }),
 
   motionReduced:
     typeof window !== "undefined" &&

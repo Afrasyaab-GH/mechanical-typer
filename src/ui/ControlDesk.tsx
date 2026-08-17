@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { getCore } from "../app/core";
 import { useStore } from "../app/store";
 import { t } from "../app/i18n";
@@ -20,22 +20,57 @@ export function ControlDesk() {
   const core = getCore();
   const { machine, manuscript } = core;
   const exploded = state.explodeTarget > 0.5;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelHidden = state.panelHidden;
+  const setPanelHidden = state.setPanelHidden;
+
+  // Close control desk when user clicks outside in the window
+  useEffect(() => {
+    if (panelHidden) return;
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".panel-trigger")) return;
+      if (panelRef.current && !panelRef.current.contains(target)) {
+        setPanelHidden(true);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPanelHidden(true);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      window.addEventListener("mousedown", handleOutsideClick);
+      window.addEventListener("touchstart", handleOutsideClick);
+      window.addEventListener("keydown", handleKeyDown);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("touchstart", handleOutsideClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [panelHidden, setPanelHidden]);
 
   if (state.panelHidden) {
     return (
       <button
-        className="hud-btn panel-chip"
+        className="hud-btn panel-trigger"
         onClick={state.togglePanel}
         aria-label="Show control panel"
         aria-expanded={false}
       >
-        {t("panel.show")} ▴
+        PANEL ▴
       </button>
     );
   }
 
   return (
-    <div className="control-bar panel" role="toolbar" aria-label="Machine controls">
+    <div ref={panelRef} className="control-bar panel" role="toolbar" aria-label="Machine controls">
       <div className="panel-head">
         <span className="panel-title">CONTROL DESK</span>
         <button
@@ -115,7 +150,7 @@ export function ControlDesk() {
           <button className="hud-btn" onClick={() => manuscript.redo()} disabled={!manuscript.canRedo} aria-label="Redo">
             {t("btn.redo")}
           </button>
-          <button className="hud-btn accent" onClick={() => state.setExportOpen(true)} aria-label="Export as Word document">
+          <button className="hud-btn accent" onClick={() => state.setExportOpen(true)} aria-label="Export manuscript">
             {t("btn.export")}
           </button>
           <button

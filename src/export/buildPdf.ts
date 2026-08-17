@@ -4,6 +4,7 @@ import {
   createZeroWidthWatermarkString,
   stripZeroWidthCharacters,
 } from "../steganography/SteganographyEncoder";
+import { getKeystrokeLedger } from "../recorder/KeystrokeLedger";
 
 export interface PdfOptions {
   title: string;
@@ -33,11 +34,12 @@ export async function buildPdf(
   options: PdfOptions,
 ): Promise<PdfResult> {
   const fullCleanText = stripZeroWidthCharacters(manuscript.getText());
+  const ledgerMetrics = getKeystrokeLedger().getMetrics();
   const zwWatermark = await createZeroWidthWatermarkString(fullCleanText, {
     author: options.author || undefined,
     title: options.title || undefined,
-    entropyScore: options.entropyScore,
-    keystrokeCount: options.keystrokeCount,
+    entropyScore: options.entropyScore ?? ledgerMetrics?.cadenceEntropyScore,
+    keystrokeCount: options.keystrokeCount ?? ledgerMetrics?.totalKeystrokes,
   });
 
   const doc = new jsPDF({

@@ -81,9 +81,67 @@ export class InputManager {
   }
 
   onKeyDown(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const isEditingField =
+      target &&
+      (target.tagName === "INPUT" ||
+        (target.tagName === "TEXTAREA" && !target.classList.contains("ime-input")) ||
+        target.isContentEditable);
+
+    if (isEditingField) {
+      if (event.code === "Escape") {
+        const state = useStore.getState();
+        if (state.mainMenuOpen) {
+          state.setMainMenuOpen(false);
+        }
+      }
+      return;
+    }
+
     this.core.sound.unlock();
     const state = useStore.getState();
     const { machine, manuscript } = this.core;
+
+    if (event.code === "Escape") {
+      if (state.sidebarOpen) {
+        state.setSidebarOpen(false);
+        return;
+      }
+      if (!state.panelHidden) {
+        state.setPanelHidden(true);
+        return;
+      }
+      if (state.exportOpen) {
+        state.setExportOpen(false);
+        return;
+      }
+      if (state.customizeOpen) {
+        state.setCustomizeOpen(false);
+        return;
+      }
+      if (state.verifyOpen) {
+        state.setVerifyOpen(false);
+        return;
+      }
+      if (state.selectedPart) {
+        state.selectPart(null);
+        return;
+      }
+      if (state.clearConfirm) {
+        state.setClearConfirm(false);
+        return;
+      }
+      if (state.mainMenuOpen) {
+        state.setMainMenuOpen(false);
+        return;
+      }
+      state.toggleSidebar();
+      return;
+    }
+
+    if (state.mainMenuOpen || state.sidebarOpen) {
+      return;
+    }
 
     if (event.metaKey || event.ctrlKey) {
       const key = event.key.toLowerCase();
@@ -113,12 +171,6 @@ export class InputManager {
       return;
     }
 
-    if (event.code === "Escape") {
-      state.setExportOpen(false);
-      state.selectPart(null);
-      state.setClearConfirm(false);
-      return;
-    }
     // While a dialog or the export drawer is open, Tab keeps its native
     // focus-navigation role so every control stays keyboard-reachable.
     if (

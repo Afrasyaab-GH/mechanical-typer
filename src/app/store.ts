@@ -136,6 +136,16 @@ interface AppState {
   exportError: string | null;
   setExportError: (error: string | null) => void;
 
+  recording: boolean;
+  setRecording: (recording: boolean) => void;
+  recordingDuration: number;
+  setRecordingDuration: (duration: number) => void;
+  hasRecordedVideo: boolean;
+  setHasRecordedVideo: (has: boolean) => void;
+
+  verifyOpen: boolean;
+  setVerifyOpen: (open: boolean) => void;
+
   clearConfirm: boolean;
   setClearConfirm: (open: boolean) => void;
 
@@ -287,6 +297,16 @@ export const useStore = create<AppState>((set, get) => ({
   setExportResult: (exportResult) => set({ exportResult }),
   exportError: null,
   setExportError: (exportError) => set({ exportError }),
+
+  recording: false,
+  setRecording: (recording) => set({ recording }),
+  recordingDuration: 0,
+  setRecordingDuration: (recordingDuration) => set({ recordingDuration }),
+  hasRecordedVideo: false,
+  setHasRecordedVideo: (hasRecordedVideo) => set({ hasRecordedVideo }),
+
+  verifyOpen: false,
+  setVerifyOpen: (verifyOpen) => set({ verifyOpen }),
 
   clearConfirm: false,
   setClearConfirm: (clearConfirm) => set({ clearConfirm }),

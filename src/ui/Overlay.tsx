@@ -4,16 +4,60 @@ import { useStore } from "../app/store";
 import { t } from "../app/i18n";
 import { discardDraft, loadDraft } from "../document/draftStorage";
 import type { InputManager } from "../input/InputManager";
+import { getCanvasVideoRecorder } from "../recorder/CanvasVideoRecorder";
 import { ControlDesk } from "./ControlDesk";
 import { PartInfo } from "./PartInfo";
 import { ExportDrawer } from "./ExportDrawer";
 import { CustomizeDrawer } from "./CustomizeDrawer";
+
+import { VerifyDrawer } from "./VerifyDrawer";
 
 export function Overlay({ manager }: { manager: InputManager | null }) {
   const state = useStore();
   const core = getCore();
   const [hasTyped, setHasTyped] = useState(false);
   const [imePreview, setImePreview] = useState("");
+
+  const recorder = getCanvasVideoRecorder();
+  const recording = useStore((s) => s.recording);
+  const setRecording = useStore((s) => s.setRecording);
+  const recordingDuration = useStore((s) => s.recordingDuration);
+  const setRecordingDuration = useStore((s) => s.setRecordingDuration);
+  const setHasRecordedVideo = useStore((s) => s.setHasRecordedVideo);
+
+  useEffect(() => {
+    const unsubStatus = recorder.onStatusChange((status) => {
+      setRecording(status === "recording");
+    });
+    const unsubTick = recorder.onTick((duration) => {
+      setRecordingDuration(duration);
+    });
+    return () => {
+      unsubStatus();
+      unsubTick();
+    };
+  }, [recorder, setRecording, setRecordingDuration]);
+
+  const toggleRecording = async () => {
+    if (recorder.isRecording()) {
+      const blob = await recorder.stop();
+      if (blob && blob.size > 0) {
+        setHasRecordedVideo(true);
+        state.showPlaqueKey("plaque.recStopped", 4500);
+      }
+    } else {
+      const canvas = document.querySelector("canvas");
+      if (!canvas) {
+        state.showPlaque("CANVAS NOT AVAILABLE");
+        return;
+      }
+      const audioNodes = core.sound.getAudioNodes();
+      const started = recorder.start(canvas, audioNodes, { fps: 60 });
+      if (started) {
+        state.showPlaqueKey("plaque.recStarted", 3500);
+      }
+    }
+  };
 
   useEffect(() => core.machine.bus.on("impact", () => setHasTyped(true)), [core]);
   useEffect(() => {
@@ -37,10 +81,33 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
   return (
     <div className="overlay">
       <header className="hud-title">
-        <h1>THE IMPACT No. 01</h1>
+        <h1>PLATEN</h1>
         <p className="subtitle">{t("subtitle")}</p>
         <p className="tagline">{t("tagline1")}</p>
       </header>
+
+      {/* Top-Right Vintage Video & Audio Proof of Authorship Recorder */}
+      <div className="hud-rec-container">
+        <button
+          className={`hud-btn hud-rec-btn ${recording ? "recording" : ""}`}
+          onClick={toggleRecording}
+          aria-label={recording ? "Stop Recording Proof" : "Start Recording Proof"}
+          title={
+            recording
+              ? "Stop 60 FPS video recording"
+              : "Record 60 FPS video with synchronized mechanical sound effects"
+          }
+        >
+          <span className="hud-rec-dot" />
+          <span className="hud-rec-label">{recording ? t("btn.stopRec") : t("btn.rec")}</span>
+          {recording && (
+            <span className="hud-rec-timer">
+              {String(Math.floor(recordingDuration / 60)).padStart(2, "0")}:
+              {String(recordingDuration % 60).padStart(2, "0")}
+            </span>
+          )}
+        </button>
+      </div>
 
       {!hasTyped && <div className="hud-hint">{t("hint")}</div>}
 
@@ -103,6 +170,7 @@ export function Overlay({ manager }: { manager: InputManager | null }) {
 
       <PartInfo />
       <ExportDrawer />
+      <VerifyDrawer />
       <CustomizeDrawer />
       <ControlDesk />
 

@@ -18,8 +18,8 @@ function webglAvailable(): boolean {
 function WebGLFallback() {
   return (
     <div className="webgl-fallback">
-      <h1>THE IMPACT No. 01</h1>
-      <p className="plaque warn">THIS BROWSER CANNOT START THE MECHANICAL DOCUMENT EDITOR.</p>
+      <h1>PLATEN: 3D TYPEWRITER</h1>
+      <p className="plaque warn">THIS BROWSER CANNOT START THE 3D TYPEWRITER.</p>
       <p>Enable hardware acceleration or use a modern WebGL-capable browser.</p>
     </div>
   );

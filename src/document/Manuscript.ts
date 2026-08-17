@@ -586,10 +586,11 @@ export class Manuscript {
   }
 }
 
-export const SAMPLE_MANUSCRIPT = `THE IMPACT No. 01\fBefore words became data, they were impact.\f\fEvery letter on this page arrived the slow way:
+export const SAMPLE_MANUSCRIPT = `PLATEN: 3D TYPEWRITER\fWrite to hold, own and carry.\f\fNo algorithms, no autocomplete—just ink, steel, and intention.\fCrafted for the weight of genuine writing.\f\fEvery letter on this page arrived the slow way:
 a finger fell, a lever turned, a steel bar rose
 from the basket, and a small block of type struck
 a ribbon against rubber and bone-white paper.
 
 The machine did not remember anything.
-The paper did.`;
+The paper did.
+What you write here is yours to hold, own, and carry.`;

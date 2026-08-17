@@ -4,6 +4,8 @@ import { Lighting, DeskSet } from "./Lighting";
 import { Machine } from "./Machine";
 import { CameraController } from "./CameraController";
 import { PartPicker } from "./PartPicker";
+import { DeskPlanet } from "./DeskPlanet";
+import { EarthPlanet } from "./EarthPlanet";
 
 function isCoarsePointer(): boolean {
   return typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
@@ -30,6 +32,9 @@ export function TypewriterScene() {
       <Machine />
       <CameraController />
       <PartPicker />
+      {/* Decorative Celestial Desk Globes (Equidistant from side panels) */}
+      <DeskPlanet position={[28, 2.4, 2]} scale={2.4} />
+      <EarthPlanet position={[-28, 2.4, 2]} scale={2.4} />
     </Canvas>
   );
 }

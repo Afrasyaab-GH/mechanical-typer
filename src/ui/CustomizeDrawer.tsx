@@ -115,7 +115,7 @@ export function CustomizeDrawer() {
               type="text"
               value={documentTitle}
               onChange={(event) => setDocumentTitle(event.target.value)}
-              placeholder="— THE IMPACT NO. 01 —"
+              placeholder="— PLATEN: 3D TYPEWRITER —"
               style={{ width: "100%", padding: "8px 10px", fontSize: "13px", boxSizing: "border-box" }}
               aria-label="Configurable page header title"
             />

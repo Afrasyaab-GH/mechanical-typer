@@ -241,7 +241,7 @@ export function Machine() {
     build.refs.basketGroup.position.y = machine.basketShift * 0.85;
     const lift = machine.vibratorLift();
     build.refs.vibratorAction.position.y = lift * 0.65;
-    build.refs.vibratorAction.position.z = -lift * 0.18;
+    build.refs.vibratorAction.position.z = -lift * 0.08; // Matched to ribbon shift to prevent paper clipping
     build.refs.universalBarAction.position.y = -machine.universalBarDip() * 0.14;
 
     // --- Carriage train ---
@@ -258,6 +258,26 @@ export function Machine() {
     build.refs.spoolR.rotation.y = machine.spoolAngle;
     build.refs.returnLeverAction.rotation.x = machine.returnLeverPull * 0.55;
     build.refs.bellAction.scale.setScalar(1 + machine.bellFlash * 0.08);
+
+    // --- Ribbon Mechanism Extras ---
+    if (
+      build.refs.ribbonAdvanceGear &&
+      build.refs.ribbonReverseGear &&
+      build.refs.ribbonAdvanceSpindle &&
+      build.refs.ribbonReverseSpindle &&
+      build.refs.ribbonAdvanceRocker
+    ) {
+      // The cross-shaft miter gears have a ~1.9:1 ratio with the vertical spindle miter gears
+      build.refs.ribbonAdvanceGear.rotation.x = machine.spoolAngle * 1.9;
+      build.refs.ribbonReverseGear.rotation.x = machine.spoolAngle * 1.9;
+      
+      // Vertical spindles directly follow spool rotation
+      build.refs.ribbonAdvanceSpindle.rotation.y = machine.spoolAngle;
+      build.refs.ribbonReverseSpindle.rotation.y = -machine.spoolAngle;
+
+      // Pawl rocker follows universal bar dip
+      build.refs.ribbonAdvanceRocker.rotation.x = -machine.universalBarDip() * 0.6;
+    }
 
     // --- Ribbon path ---
     const tipL = build.refs.ribbonTipL;

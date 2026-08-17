@@ -26,7 +26,12 @@ export function CameraController() {
   const transitioning = useRef(false);
 
   // Mode changes: reframe, pulling back on narrow (mobile) viewports
+  const lastCameraMode = useRef<CameraMode | null>(null);
+
   useEffect(() => {
+    if (lastCameraMode.current === cameraMode) return;
+    lastCameraMode.current = cameraMode;
+
     const mode = CAMERA_MODES[cameraMode];
     destination.current.pos.copy(mode.pos);
     destination.current.target.copy(mode.target);
@@ -88,6 +93,9 @@ export function CameraController() {
       minPolarAngle={0.12}
       maxPolarAngle={1.42}
       target={CAMERA_MODES.write.target.toArray() as [number, number, number]}
+      onStart={() => {
+        transitioning.current = false;
+      }}
     />
   );
 }

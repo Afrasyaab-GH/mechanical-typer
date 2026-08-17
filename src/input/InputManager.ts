@@ -89,11 +89,13 @@ export class InputManager {
       const key = event.key.toLowerCase();
       if (key === "z" && !event.shiftKey) {
         event.preventDefault();
+        this.core.ledger.record("undo", "Undo", undefined, manuscript.cursor.col, manuscript.cursor.line, manuscript.cursor.page);
         manuscript.undo();
         return;
       }
       if ((key === "z" && event.shiftKey) || key === "y") {
         event.preventDefault();
+        this.core.ledger.record("redo", "Redo", undefined, manuscript.cursor.col, manuscript.cursor.line, manuscript.cursor.page);
         manuscript.redo();
         return;
       }
@@ -104,6 +106,7 @@ export class InputManager {
       }
       if (event.code === "Enter") {
         event.preventDefault();
+        this.core.ledger.record("sheet", "Enter", undefined, manuscript.cursor.col, manuscript.cursor.line, manuscript.cursor.page);
         machine.newSheet();
         return;
       }
@@ -127,6 +130,7 @@ export class InputManager {
     if (this.composing) return;
     if (event.code === "Enter") {
       event.preventDefault();
+      this.core.ledger.record("return", "Enter", "\n", manuscript.cursor.col, manuscript.cursor.line, manuscript.cursor.page);
       machine.carriageReturn();
       return;
     }
@@ -155,6 +159,8 @@ export class InputManager {
     }
     if (KEY_BY_CODE[event.code]) {
       event.preventDefault();
+      const actionType = event.code === "Space" ? "space" : event.code === "Backspace" ? "backspace" : "press";
+      this.core.ledger.record(actionType, event.code, event.key.length === 1 ? event.key : undefined, manuscript.cursor.col, manuscript.cursor.line, manuscript.cursor.page);
       machine.press(event.code, { repeat: event.repeat, key: event.key, shiftKey: event.shiftKey });
     }
   }

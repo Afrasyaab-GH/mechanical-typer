@@ -2,12 +2,14 @@ import { Manuscript } from "../document/Manuscript";
 import { PaperTexture } from "../document/PaperTexture";
 import { MachineState } from "../machine/machineState";
 import { MechanicalAudio, type SoundEvent } from "../audio/MechanicalAudio";
+import { KeystrokeLedger, getKeystrokeLedger } from "../recorder/KeystrokeLedger";
 
 export interface Core {
   manuscript: Manuscript;
   machine: MachineState;
   sound: MechanicalAudio;
   paper: PaperTexture;
+  ledger: KeystrokeLedger;
   wired: boolean;
 }
 
@@ -20,7 +22,8 @@ export function getCore(): Core {
     const machine = new MachineState(manuscript);
     const sound = new MechanicalAudio();
     const paper = new PaperTexture(manuscript);
-    core = { manuscript, machine, sound, paper, wired: false };
+    const ledger = getKeystrokeLedger();
+    core = { manuscript, machine, sound, paper, ledger, wired: false };
   }
   return core;
 }

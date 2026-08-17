@@ -275,6 +275,11 @@ export interface MachineRefs {
   ribbonTipR: THREE.Vector3;
   paperMesh: THREE.Mesh;
   topGuide: THREE.Group;
+  ribbonAdvanceGear?: THREE.Object3D;
+  ribbonAdvanceSpindle?: THREE.Object3D;
+  ribbonAdvanceRocker?: THREE.Object3D;
+  ribbonReverseSpindle?: THREE.Object3D;
+  ribbonReverseGear?: THREE.Object3D;
   updatePaper: (line: number, mode?: "sheet" | "scroll") => void;
 }
 
@@ -935,7 +940,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       {
         id: "universalBar",
         label: "Universal bar",
-        fn: "Every key trips it to free the escapement",
+        fn: "Transverse bail tripped by every key lever to fire the escapement",
         system: "basket",
         stagger: 0.58,
         offset: { pz: 3.2, py: -1.2 },
@@ -943,58 +948,41 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: ["escapement.starWheel"],
       },
       (group) => {
-        // Base mounting pivot brackets anchored to chassis tray
+        // Base mounting trunnions on the lower chassis floor
         for (const side of [-1, 1]) {
-          const pivotPost = boxMesh(0.45, 3.2, 0.6, mats.steelDark);
-          pivotPost.position.set(side * 8.8, 8.4, 1.2);
+          const pivotPost = boxMesh(0.45, 1.6, 0.6, mats.steelDark);
+          pivotPost.position.set(side * 8.8, 3.8, 1.0);
           group.add(pivotPost);
 
-          // Brass shoulder pivot screw
-          const pivotScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.65, 12), mats.brass);
+          const pivotScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.55, 12), mats.brass);
           pivotScrew.rotation.z = Math.PI / 2;
-          pivotScrew.position.set(side * 8.8, 7.2, 1.2);
+          pivotScrew.position.set(side * 8.8, 3.8, 1.0);
           group.add(pivotScrew);
         }
 
         const inner = new THREE.Group();
         group.add(inner);
 
-        // Main transverse curved universal bail bar - Round, metallic, thin, moved up
+        // Main transverse universal bar sitting beneath levers at Y = 4.0
         const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 17.6, 16), mats.nickel);
         bar.rotation.z = Math.PI / 2;
-        bar.position.set(0, 10.9, 0.5);
+        bar.position.set(0, 4.0, 1.0);
         bar.castShadow = true;
         inner.add(bar);
 
-        // Sublever contact comb/flange plate along lower edge
-        const comb = boxMesh(16.8, 0.18, 0.75, mats.steelDark);
-        comb.position.set(0, 10.75, 0.65);
+        // Comb contact plate
+        const comb = boxMesh(16.8, 0.14, 0.65, mats.steelDark);
+        comb.position.set(0, 4.1, 1.0);
         inner.add(comb);
 
-        // Left and Right swing pivot arms (bellcranks) reaching down to chassis pivots
-        for (const side of [-1, 1]) {
-          const arm = rodBetween(
-            new THREE.Vector3(side * 8.8, 7.2, 1.2),
-            new THREE.Vector3(side * 8.7, 10.9, 0.5),
-            0.18,
-            mats.steelDark,
-          );
-          inner.add(arm);
-        }
-
-        // Center rear trip linkage / pushrod connecting universal bar to escapement rocker
+        // Low-level rear pushrod running under the basket into escapement rocker
         const tripPushrod = rodBetween(
-          new THREE.Vector3(0, 10.9, 0.5),
-          new THREE.Vector3(0, 11.1, -2.4),
-          0.12,
+          new THREE.Vector3(0, 4.0, 1.0),
+          new THREE.Vector3(0, 5.2, -2.4),
+          0.1,
           mats.nickel,
         );
         inner.add(tripPushrod);
-
-        // Clevis link coupling head at the escapement rocker end
-        const clevis = boxMesh(0.3, 0.3, 0.5, mats.steelDark);
-        clevis.position.set(0, 11.1, -2.4);
-        inner.add(clevis);
 
         return inner;
       },
@@ -1818,6 +1806,24 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.52), mats.ribbon);
         strip.position.set(0, 0.55, 0.02);
         inner.add(strip);
+
+        // Rear actuator link rod positioned cleanly behind the segment frame (Z <= -2.2)
+        const rearActuatorRod = rodBetween(
+          new THREE.Vector3(0, -0.3, 0),
+          new THREE.Vector3(0, -1.2, -1.0), // Reaches back behind the segment casting (global Z = -2.36)
+          0.12,
+          mats.nickel,
+        );
+        inner.add(rearActuatorRod);
+
+        const verticalGuideRod = rodBetween(
+          new THREE.Vector3(0, -1.2, -1.0),
+          new THREE.Vector3(0, -7.9, -1.0), // Extends down behind segment to lower chassis escapement/universal trip horn (Y=5.2, Z=-2.36)
+          0.1,
+          mats.nickel,
+        );
+        inner.add(verticalGuideRod);
+
         return inner;
       },
     );
@@ -1863,77 +1869,87 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       downstream: ["ribbon.spoolR"],
     },
     (group) => {
-      // Transverse Ribbon Drive Cross-Shaft spanning under the deck between spools
+      // Group for rotating cross-shaft components lowered safely under the basket
+      const gearGroup = new THREE.Group();
+      gearGroup.position.set(0, 5.2, -3.6);
+      
       const driveShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 16.2, 16), mats.steelDark);
       driveShaft.rotation.z = Math.PI / 2;
-      driveShaft.position.set(0, 11.0, -1.2);
-      group.add(driveShaft);
+      gearGroup.add(driveShaft);
 
-      // Bearing pillow block brackets anchoring the cross-shaft to the chassis frame
-      for (const xBracket of [-7.6, 0, 7.6]) {
-        const pillowBlock = boxMesh(0.55, 1.2, 0.7, mats.steelDark);
-        pillowBlock.position.set(xBracket, 10.6, -1.2);
-        group.add(pillowBlock);
-
-        const brassBushing = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.6, 12), mats.brass);
-        brassBushing.rotation.z = Math.PI / 2;
-        brassBushing.position.set(xBracket, 11.0, -1.2);
-        group.add(brassBushing);
-      }
-
-      // Right vertical spool spindle shaft connecting deck spool to cross-shaft
-      const rightSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.2, 14), mats.steelDark);
-      rightSpoolSpindle.position.set(8.0, 12.0, -1.2);
-      group.add(rightSpoolSpindle);
-
-      // Right miter bevel gear pair transferring rotation to vertical spindle
       const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.2, 0.28, 14), mats.brass);
       miterGearH.rotation.z = Math.PI / 2;
-      miterGearH.position.set(7.7, 11.0, -1.2);
-      group.add(miterGearH);
+      miterGearH.position.set(7.7, 0, 0);
+      gearGroup.add(miterGearH);
 
-      const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
-      miterGearV.position.set(8.0, 11.3, -1.2);
-      group.add(miterGearV);
-
-      // Ribbon Advance Ratchet Wheel on cross shaft
       const ratchetWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 18), mats.brass);
       ratchetWheel.rotation.z = Math.PI / 2;
-      ratchetWheel.position.set(4.8, 11.0, -1.2);
-      group.add(ratchetWheel);
+      ratchetWheel.position.set(4.8, 0, 0);
+      gearGroup.add(ratchetWheel);
 
       for (let i = 0; i < 12; i++) {
         const tooth = boxMesh(0.28, 0.15, 0.24, mats.brass);
         const angle = (i / 12) * Math.PI * 2;
-        tooth.position.set(4.8, 11.0 + Math.cos(angle) * 0.92, -1.2 + Math.sin(angle) * 0.92);
+        tooth.position.set(4.8, Math.cos(angle) * 0.92, Math.sin(angle) * 0.92);
         tooth.rotation.x = angle + 0.25;
-        group.add(tooth);
+        gearGroup.add(tooth);
       }
+      group.add(gearGroup);
+      refs.ribbonAdvanceGear = gearGroup;
 
-      // Driving Pawl Actuator Rocker linked to universal bar motion
+      // Group for right vertical spindle components extending from Y = 5.2 up to spool height Y = 13.25
+      const spindleGroup = new THREE.Group();
+      spindleGroup.position.set(8.0, 5.2, -1.2);
+      
+      const rightSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 8.2, 14), mats.steelDark);
+      rightSpoolSpindle.position.set(0, 4.1, 0);
+      spindleGroup.add(rightSpoolSpindle);
+
+      const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
+      spindleGroup.add(miterGearV);
+      
+      group.add(spindleGroup);
+      refs.ribbonAdvanceSpindle = spindleGroup;
+
+      // Group for the rocker actuated by universal bar
+      const rockerGroup = new THREE.Group();
+      rockerGroup.position.set(5.15, 5.7, -3.6);
+
       const pawlRocker = boxMesh(0.24, 1.3, 0.38, mats.steelDark);
-      pawlRocker.position.set(5.15, 11.5, -1.2);
       pawlRocker.rotation.x = 0.32;
-      group.add(pawlRocker);
+      rockerGroup.add(pawlRocker);
 
-      // Hardened steel driving pawl
       const drivePawl = boxMesh(0.16, 0.8, 0.18, mats.steelDark);
-      drivePawl.position.set(5.15, 11.9, -0.98);
+      drivePawl.position.set(0, 0.4, 0.22);
       drivePawl.rotation.x = -0.42;
-      group.add(drivePawl);
+      rockerGroup.add(drivePawl);
 
-      // Actuator link rod to universal bar
       const actRod = rodBetween(
-        new THREE.Vector3(4.5, 10.9, 0.5),
-        new THREE.Vector3(5.15, 11.1, -1.2),
+        new THREE.Vector3(-0.65, -0.6, 1.7),
+        new THREE.Vector3(0, -0.4, 0),
         0.1,
         mats.steelDark,
       );
-      group.add(actRod);
+      rockerGroup.add(actRod);
 
-      // Anti-reverse retention click pawl
+      group.add(rockerGroup);
+      refs.ribbonAdvanceRocker = rockerGroup;
+
+      // Bearing pillow block brackets anchoring the cross-shaft to the chassis frame
+      for (const xBracket of [-7.6, 0, 7.6]) {
+        const pillowBlock = boxMesh(0.55, 1.2, 0.7, mats.steelDark);
+        pillowBlock.position.set(xBracket, 4.8, -3.6);
+        group.add(pillowBlock);
+
+        const brassBushing = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.6, 12), mats.brass);
+        brassBushing.rotation.z = Math.PI / 2;
+        brassBushing.position.set(xBracket, 5.2, -3.6);
+        group.add(brassBushing);
+      }
+
+      // Anti-reverse retention click pawl (static housing)
       const holdPawl = boxMesh(0.16, 0.65, 0.16, mats.steelDark);
-      holdPawl.position.set(4.8, 10.25, -0.78);
+      holdPawl.position.set(4.8, 4.45, -3.18);
       holdPawl.rotation.x = 0.48;
       group.add(holdPawl);
 
@@ -1955,47 +1971,60 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     },
     (group) => {
       // Left vertical spool spindle shaft connecting left spool to cross-shaft
-      const leftSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.2, 14), mats.steelDark);
-      leftSpoolSpindle.position.set(-8.0, 12.0, 0.5);
-      group.add(leftSpoolSpindle);
+      const spindleGroup = new THREE.Group();
+      spindleGroup.position.set(-8.0, 5.2, -1.2);
 
-      // Left miter bevel gear pair transferring rotation to vertical spindle
-      const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
-      miterGearH.rotation.z = Math.PI / 2;
-      miterGearH.position.set(-7.7, 11.0, 0.5);
-      group.add(miterGearH);
+      const leftSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 8.2, 14), mats.steelDark);
+      leftSpoolSpindle.position.set(0, 4.1, 0);
+      spindleGroup.add(leftSpoolSpindle);
 
       const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
-      miterGearV.position.set(-8.0, 11.3, 0.5);
-      group.add(miterGearV);
+      spindleGroup.add(miterGearV);
+      
+      group.add(spindleGroup);
+      refs.ribbonReverseSpindle = spindleGroup;
+
+      // Left miter bevel gear pair transferring rotation to vertical spindle
+      const gearGroup = new THREE.Group();
+      gearGroup.position.set(-7.7, 5.2, -3.6);
+      
+      const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
+      miterGearH.rotation.z = Math.PI / 2;
+      gearGroup.add(miterGearH);
+      
+      group.add(gearGroup);
+      refs.ribbonReverseGear = gearGroup;
 
       // Left and Right Ribbon Reverse Sensing Arms (Pawls) extending through deck slots
       for (const side of [-1, 1]) {
-        // Pivot bracket mounted under the deck
-        const mount = boxMesh(0.32, 0.85, 0.55, mats.steelDark);
-        mount.position.set(side * 6.5, 11.6, 0.5);
+        // Spool edge guide bracket
+        const mount = boxMesh(0.35, 0.85, 0.45, mats.steelDark);
+        mount.position.set(side * 6.8, 12.4, 0.5);
         group.add(mount);
 
-        // Sensing lever arm extending up into the ribbon path
-        const sensingArm = boxMesh(0.18, 1.45, 0.2, mats.steelDark);
-        sensingArm.position.set(side * 6.5, 12.35, 0.5);
-        sensingArm.rotation.z = side * -0.22;
-        group.add(sensingArm);
-
-        // Contact fork/finger that detects ribbon eyelet at spool end
-        const fork = boxMesh(0.14, 0.18, 0.5, mats.nickel);
-        fork.position.set(side * 6.35, 12.95, 0.5);
+        // Sensing contact fork that trips when ribbon eyelet catches
+        const fork = boxMesh(0.16, 0.9, 0.35, mats.nickel);
+        fork.position.set(side * 6.6, 13.0, 0.5);
         group.add(fork);
+
+        // Side vertical dropper rod running down the outer perimeter to floor level:
+        const dropperRod = rodBetween(
+          new THREE.Vector3(side * 6.8, 12.2, 0.5),
+          new THREE.Vector3(side * 6.8, 5.4, -3.6),
+          0.08,
+          mats.steelDark,
+        );
+        group.add(dropperRod);
       }
 
-      // Ribbon feed direction reversing cross-shifter linkage
-      const shiftLink = boxMesh(12.8, 0.18, 0.18, mats.steelDark);
-      shiftLink.position.set(0, 11.4, 0.5);
+      // Low-level transverse shifter rod parallel to the ribbon advance drive shaft
+      const shiftLink = boxMesh(14.0, 0.16, 0.16, mats.steelDark);
+      shiftLink.position.set(0, 5.4, -3.6);
       group.add(shiftLink);
 
-      // Center toggle detent & rocker
-      const toggle = boxMesh(0.42, 0.75, 0.32, mats.brass);
-      toggle.position.set(0, 11.3, 0.5);
+      // Clutch toggle block down on the chassis floor
+      const toggle = boxMesh(0.42, 0.6, 0.32, mats.brass);
+      toggle.position.set(0, 5.4, -3.6);
       group.add(toggle);
 
       return null;
@@ -2009,31 +2038,38 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     {
       id: "frame.chassis",
       label: "Main chassis",
-      fn: "Solid cast-iron unified chassis of the typewriter",
+      fn: "Die-cast hollow perimeter frame housing internal linkages",
       system: "frame",
       stagger: 0.94,
       offset: {},
     },
     (group) => {
-      group.position.set(0, 4.8, 0);
+      group.position.set(0, 2.4, 4.4); // Lowered to desk floor level
 
-      // Heavy contoured base chassis pan with filleted corners
-      const basePan = roundedBoxMesh(40.2, 2.6, 26.4, 0.6, 0.2, mats.enamel);
-      basePan.position.set(0, 0, 4.4);
-      basePan.castShadow = true;
-      basePan.receiveShadow = true;
-      group.add(basePan);
+      // 1. Thin Bottom Floor Pan (Y = 0 relative, beneath all levers)
+      const bottomPan = roundedBoxMesh(40.2, 0.4, 26.4, 0.6, 0.1, mats.enamel);
+      bottomPan.position.set(0, 0.2, 0);
+      bottomPan.castShadow = true;
+      bottomPan.receiveShadow = true;
+      group.add(bottomPan);
 
-      // Recessed stepped keyboard floor tray
-      const tray = roundedBoxMesh(36.0, 1.2, 14.2, 0.35, 0.1, mats.enamelPanel);
-      tray.position.set(0, 1.2, 10.2);
-      tray.castShadow = true;
-      group.add(tray);
+      // 2. Left and Right Structural Side Rails
+      for (const side of [-1, 1]) {
+        const sideWall = boxMesh(1.2, 2.8, 26.0, mats.enamel);
+        sideWall.position.set(side * 19.4, 1.4, 0);
+        group.add(sideWall);
+      }
 
-      // Segment frame cradle
-      const cradle = boxMesh(26, 2.2, 6.5, mats.steelDark);
-      cradle.position.set(0, 2.2, -3.2);
-      group.add(cradle);
+      // 3. Front Base Cross-Member
+      const frontBase = boxMesh(38.0, 1.8, 1.2, mats.enamel);
+      frontBase.position.set(0, 0.9, 12.6);
+      group.add(frontBase);
+
+      // 4. Rear Frame Cradle (Tucked low at back, Y = 1.6 relative)
+      const rearCradle = boxMesh(26.0, 1.8, 4.2, mats.steelDark);
+      rearCradle.position.set(0, 0.9, -11.0);
+      group.add(rearCradle);
+
       return null;
     },
   );
@@ -2115,7 +2151,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       const name = new THREE.Mesh(
         new THREE.PlaneGeometry(10.5, 1.2),
-        new THREE.MeshBasicMaterial({ map: keycapTexture("THE IMPACT No. 01", ""), transparent: true }),
+        new THREE.MeshBasicMaterial({ map: keycapTexture("PLATEN", ""), transparent: true }),
       );
       name.position.set(0, 0.45, 0.79);
       name.rotation.x = 0.18;

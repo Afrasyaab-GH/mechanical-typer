@@ -68,7 +68,7 @@ function buildPaperBackground(): HTMLCanvasElement {
 export class PaperTexture {
   canvas: HTMLCanvasElement;
   texture: THREE.CanvasTexture;
-  documentTitle = "— THE IMPACT NO. 01 —";
+  documentTitle = "— PLATEN: 3D TYPEWRITER —";
   fontFamily = "Courier Prime";
   fontSizePx = 50;
   letterSpacingMultiplier = 1.0;

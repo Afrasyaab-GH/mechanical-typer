@@ -119,6 +119,14 @@ export function ControlDesk() {
             {t("btn.export")}
           </button>
           <button
+            className="hud-btn"
+            style={{ borderColor: "rgba(176, 141, 87, 0.4)" }}
+            onClick={() => state.setVerifyOpen(true)}
+            aria-label="Verify Platen Document Ownership"
+          >
+            {t("btn.verify")}
+          </button>
+          <button
             className="hud-btn danger"
             onClick={() => state.setClearConfirm(true)}
             aria-label="Clear the entire manuscript"

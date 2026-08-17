@@ -10,6 +10,11 @@ import JSZip from "jszip";
 import type { Manuscript } from "../document/Manuscript";
 import { FONT_FALLBACKS, FONT_FAMILY } from "../machine/constants";
 
+import {
+  createZeroWidthWatermarkString,
+  stripZeroWidthCharacters,
+} from "../steganography/SteganographyEncoder";
+
 export type OverstrikeMode = "final" | "annotated";
 
 export interface DocxOptions {
@@ -18,6 +23,8 @@ export interface DocxOptions {
   overstrikeMode: OverstrikeMode;
   embedFont: boolean;
   fontData?: ArrayBuffer;
+  entropyScore?: number;
+  keystrokeCount?: number;
 }
 
 export interface DocxResult {
@@ -39,7 +46,13 @@ const PAGE_HEIGHT = 16838;
 const MARGIN = 1440; // 1 inch
 
 /** One mechanical line → Word runs, honoring the overstrike mode. */
-function lineRuns(manuscript: Manuscript, page: number, line: number, mode: OverstrikeMode): TextRun[] {
+function lineRuns(
+  manuscript: Manuscript,
+  page: number,
+  line: number,
+  mode: OverstrikeMode,
+  watermarkPrefix = "",
+): TextRun[] {
   const glyphs = manuscript.pages[page]?.[line] ?? [];
   const runs: Array<{ text: string; strike: boolean }> = [];
   let current = "";
@@ -61,18 +74,27 @@ function lineRuns(manuscript: Manuscript, page: number, line: number, mode: Over
   }
   flush();
   if (runs.length === 0) runs.push({ text: "", strike: false });
+  if (watermarkPrefix && runs.length > 0) {
+    runs[0].text = watermarkPrefix + runs[0].text;
+  }
   return runs.map((run) => new TextRun({ text: run.text, strike: run.strike }));
 }
 
-function buildDocument(manuscript: Manuscript, options: DocxOptions): Document {
+function buildDocument(manuscript: Manuscript, options: DocxOptions, watermark = ""): Document {
   const children: Paragraph[] = [];
+  let watermarkInjected = false;
+
   for (let page = 0; page < manuscript.pages.length; page++) {
     const rows = manuscript.pages[page];
     for (let line = 0; line < rows.length; line++) {
+      const prefix = !watermarkInjected ? watermark : "";
+      const runs = lineRuns(manuscript, page, line, options.overstrikeMode, prefix);
+      if (prefix) watermarkInjected = true;
+
       children.push(
         new Paragraph({
           spacing: { before: 0, after: 0, line: LINE_SPACING, lineRule: LineRuleType.EXACT },
-          children: lineRuns(manuscript, page, line, options.overstrikeMode),
+          children: runs,
         }),
       );
     }
@@ -83,7 +105,7 @@ function buildDocument(manuscript: Manuscript, options: DocxOptions): Document {
   return new Document({
     creator: options.author || undefined,
     title: options.title || undefined,
-    description: "Written on THE IMPACT No. 01 — a mechanical document editor.",
+    description: "Platen · Write to hold, own and carry. Sovereignty certified.",
     styles: {
       default: {
         document: {
@@ -260,12 +282,20 @@ async function embedFontIntoDocx(
 
 export function docxFileName(date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `Impact_Manuscript_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}.docx`;
+  return `Platen_Manuscript_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}.docx`;
 }
 
 /** Builds the DOCX entirely in the browser. No network calls. */
 export async function buildDocx(manuscript: Manuscript, options: DocxOptions): Promise<DocxResult> {
-  const document = buildDocument(manuscript, options);
+  const fullCleanText = stripZeroWidthCharacters(manuscript.getText());
+  const watermark = await createZeroWidthWatermarkString(fullCleanText, {
+    author: options.author || undefined,
+    title: options.title || undefined,
+    entropyScore: options.entropyScore,
+    keystrokeCount: options.keystrokeCount,
+  });
+
+  const document = buildDocument(manuscript, options, watermark);
   let bytes: Uint8Array<ArrayBuffer> = new Uint8Array(await (await Packer.toBlob(document)).arrayBuffer());
 
   let fontEmbedded = false;

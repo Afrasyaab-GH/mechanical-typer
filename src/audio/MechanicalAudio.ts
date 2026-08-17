@@ -78,6 +78,12 @@ export class MechanicalAudio {
     }
   }
 
+  /** Returns the audio context and master gain node for external stream connections. */
+  getAudioNodes(): { ctx: AudioContext | null; master: GainNode | null } {
+    this.unlock();
+    return { ctx: this.ctx, master: this.master };
+  }
+
   /** Smoothly ramps master gain instead of destroying the graph. */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;

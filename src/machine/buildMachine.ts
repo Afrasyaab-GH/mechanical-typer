@@ -10,11 +10,11 @@ import { PAPER } from "./constants";
 
 const KEY_SPACING = 1.9;
 const ROW_POS = [
-  { z: 6.0, y: 8.6 },
-  { z: 7.95, y: 7.95 },
-  { z: 9.9, y: 7.35 },
-  { z: 11.85, y: 6.75 },
-  { z: 13.9, y: 6.15 },
+  { z: 7.4, y: 8.6 },
+  { z: 9.35, y: 7.95 },
+  { z: 11.3, y: 7.35 },
+  { z: 13.25, y: 6.75 },
+  { z: 15.3, y: 6.15 },
 ];
 const KEY_CENTER_COL = 7.4;
 const PRINT_POINT = new THREE.Vector3(0, 14.6, -1.46);
@@ -24,7 +24,72 @@ const LIP_Y = PLATEN.y + 0.2;
 const LIP_Z = PLATEN.z - PLATEN.r - 0.08; // Behind roller
 const TABLE_LENGTH = 7.5;
 const TABLE_WIDTH = 22.5; // paperWidth (21.0) + 1.5
-const BASKET = { cx: 0, cy: 9.6, cz: -2, r: 6.3 };
+export const BASKET_CONFIG = {
+  cx: 0,
+  cy: 12.8,        // Center of rear upright segment arc (lowered further)
+  cz: -1.15,       // Standing upright flat against platen / ribbon vibrator
+  radius: 5.2,     // Segment fulcrum wire radius
+  arcSpan: THREE.MathUtils.degToRad(140), // 140° fan (-70° to +70°)
+  total: TYPEBAR_COUNT,
+};
+
+// Computes exact pivot coordinates, rest target, and kinematic orientation for slot index:
+export function getBasketSlot(index: number) {
+  const total = BASKET_CONFIG.total;
+  const u = (index - (total - 1) / 2) / ((total - 1) / 2); // -1.0 (far left) to +1.0 (far right)
+  const angle = u * (BASKET_CONFIG.arcSpan / 2);
+
+  // 1. Pivot point P_i on the upright segment arc against the platen / vibrator:
+  const px = Math.sin(angle) * BASKET_CONFIG.radius;
+  const py = BASKET_CONFIG.cy - Math.cos(angle) * BASKET_CONFIG.radius;
+  const pz = BASKET_CONFIG.cz + (1.0 - Math.cos(angle)) * 0.35;
+  const pivot = new THREE.Vector3(px, py, pz);
+
+  // 2. Strike target (PRINT_POINT) and strike vector:
+  const strikeVector = PRINT_POINT.clone().sub(pivot);
+  const barLength = strikeVector.length();
+  const strikeDir = strikeVector.clone().normalize();
+
+  // 3. Resting target R_i forming the authentic U-shaped cradle fan (tips raised further):
+  const fanAngle = u * THREE.MathUtils.degToRad(62);
+  const rx = Math.sin(fanAngle) * 7.2;
+  const ry = 8.9 + (u * u) * 3.4;
+  const rz = 4.9 - (u * u) * 2.6;
+  const restTarget = new THREE.Vector3(rx, ry, rz);
+
+  // Rest direction from pivot:
+  const restVector = restTarget.clone().sub(pivot);
+  const restDir = restVector.clone().normalize();
+
+  // 4. Hinge axis H = restDir x strikeDir
+  const hingeAxis = new THREE.Vector3().crossVectors(restDir, strikeDir).normalize();
+
+  // Swing angle between rest and strike
+  const dot = THREE.MathUtils.clamp(restDir.dot(strikeDir), -1, 1);
+  const swingAngle = Math.acos(dot);
+
+  // 5. Orthonormal Basis: Local X = HingeAxis, Local Y = RestDir, Local Z = HingeAxis x RestDir
+  const zLocal = new THREE.Vector3().crossVectors(hingeAxis, restDir).normalize();
+  const xLocal = hingeAxis.clone();
+  const yLocal = restDir.clone();
+
+  const basisMatrix = new THREE.Matrix4().makeBasis(xLocal, yLocal, zLocal);
+  const orientation = new THREE.Quaternion().setFromRotationMatrix(basisMatrix);
+
+  return {
+    position: pivot,
+    pivot,
+    strikeDir,
+    restDir,
+    hingeAxis,
+    swingAngle,
+    orientation,
+    basisMatrix,
+    barLength,
+    u,
+    angle,
+  };
+}
 const LEVER_PIVOT = { y: 5, z: -2.8 };
 export const CARRIAGE_STEP = 0.2211;
 export const LINE_FEED = 24.62 / 44;
@@ -166,6 +231,595 @@ function roundedBoxMesh(
 
 function boxMesh(w: number, h: number, d: number, material: THREE.Material): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+}
+
+/** Continuous swept side fender with authentic 1930s Standard Portable silhouette matching deck & rear panel. */
+function createSideFenderGeometry(thickness = 0.8): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  // Coordinates in (Z, Y) where 2D x = Z in typewriter space, 2D y = Y:
+  // 1. Rear top corner (flush with rear panel & top deck at Y = 11.2, Z = -7.0):
+  shape.moveTo(-7.0, 11.2);
+  // 2. Rear vertical back edge down to base pan (Y = 2.4, Z = -7.0):
+  shape.lineTo(-7.0, 2.4);
+  // 3. Bottom base line to front apron (Y = 2.4, Z = 16.2):
+  shape.lineTo(16.2, 2.4);
+  // 4. Front vertical cheek brow (Y = 5.2, Z = 16.2):
+  shape.lineTo(16.2, 5.2);
+  // 5. Lower keyboard slope:
+  shape.quadraticCurveTo(12.5, 5.8, 8.5, 7.2);
+  // 6. Mid slope rise over mechanism bay:
+  shape.quadraticCurveTo(4.5, 9.2, -0.5, 11.2);
+  // 7. Top horizontal brow back to rear top corner (Y = 11.2):
+  shape.lineTo(-7.0, 11.2);
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 2,
+    bevelSize: 0.15,
+    bevelThickness: 0.15,
+    curveSegments: 32,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  // Center along X-axis (thickness):
+  geo.translate(0, 0, -thickness / 2);
+  // Rotate so 2D x (Z) -> 3D +Z, 2D y (Y) -> 3D +Y:
+  geo.rotateY(-Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Top deck plate cover with true circular cutout hole for recessed ribbon spool basin. */
+function createDeckPlateCoverGeometry(basinX: number, w = 12.0, d = 7.5): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  const x0 = -w / 2;
+  const z0 = -d / 2;
+  const r = 0.4;
+
+  shape.moveTo(x0 + r, z0);
+  shape.lineTo(x0 + w - r, z0);
+  shape.quadraticCurveTo(x0 + w, z0, x0 + w, z0 + r);
+  shape.lineTo(x0 + w, z0 + d - r);
+  shape.quadraticCurveTo(x0 + w, z0 + d, x0 + w - r, z0 + d);
+  shape.lineTo(x0 + r, z0 + d);
+  shape.quadraticCurveTo(x0, z0 + d, x0, z0 + d - r);
+  shape.lineTo(x0, z0 + r);
+  shape.quadraticCurveTo(x0, z0, x0 + r, z0);
+
+  // Circular spool cutout hole:
+  const hole = new THREE.Path();
+  hole.absarc(basinX, 0.5 - (-3.25), 2.58, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: 0.22,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.04,
+    bevelThickness: 0.04,
+    curveSegments: 36,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geo.translate(0, 0, -0.11);
+  geo.rotateX(Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Continuous swept deck cowl with organic S-curve shoulder matching side fenders. */
+function createContouredDeckCowlGeometry(width = 12.0): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  // Coordinates in (Z, Y) where x = Z in typewriter space, y = Y:
+  // 1. Rear top corner:
+  shape.moveTo(-7.0, 10.9);
+  // 2. Rear vertical wall to chassis base:
+  shape.lineTo(-7.0, 2.4);
+  // 3. Bottom base line to front sill:
+  shape.lineTo(8.5, 2.4);
+  // 4. Front vertical sill brow:
+  shape.lineTo(8.5, 3.8);
+  // 5. Lower keyboard slope:
+  shape.quadraticCurveTo(6.8, 5.8, 4.2, 8.6);
+  // 6. Smooth convex shoulder waterfall into upper ribbon spool deck:
+  shape.quadraticCurveTo(2.2, 11.2, -0.5, 11.2);
+  // 7. Sub-deck clearance step for spool basin well:
+  shape.lineTo(-0.5, 10.8);
+  shape.lineTo(-7.0, 10.8);
+  shape.closePath();
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: width,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 2,
+    bevelSize: 0.15,
+    bevelThickness: 0.15,
+    curveSegments: 32,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  // Center along X-axis (width):
+  geo.translate(0, 0, -width / 2);
+  // Rotate so 2D (x=Z, y=Y) maps into 3D (+Z, +Y, +X):
+  geo.rotateY(-Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Continuous swept deck cowl profile height at coordinate Z. */
+function getDeckProfileY(z: number): number {
+  if (z <= 0.0) return 10.8;
+  if (z <= 2.2) return 10.8 - (z / 2.2) * 0.2;
+  if (z <= 4.2) {
+    const t = (z - 2.2) / 2.0;
+    return 10.6 - t * 2.0; // 10.6 -> 8.6
+  }
+  const t = Math.min(1.0, (z - 4.2) / 1.8);
+  return 8.6 - t * 2.8; // 8.6 -> 5.8
+}
+
+/** Sculpted U-shaped basket cradle cowl wrapping directly under the typebars and connecting flush to side swept deck cowls. */
+function createUnderBasketCowlGeometry(width = 14.4, thickness = 0.20): THREE.BufferGeometry {
+  const nu = 36;
+  const nv = 28;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  const halfW = width / 2; // 7.2
+
+  function evalPoint(u: number, v: number, layer: number): THREE.Vector3 {
+    const u2 = u * u;
+
+    // Center longitudinal path (u = 0):
+    let zCenter = 0;
+    let yCenter = 0;
+    if (v <= 0.65) {
+      const w = v / 0.65;
+      zCenter = (1 - w) * (-1.15) + w * 4.4;
+      yCenter = (1 - w) * 7.5 + w * 8.4 - Math.sin(w * Math.PI) * 0.45;
+    } else {
+      const w = (v - 0.65) / 0.35;
+      const s = w * w * (3 - 2 * w);
+      zCenter = (1 - s) * 4.4 + s * 6.0;
+      yCenter = (1 - s) * 8.4 + s * 5.8;
+    }
+
+    // Side edge path (u = ±1 at X = ±7.2):
+    const zSide = -0.92 + v * (6.0 - (-0.92));
+    const ySide = getDeckProfileY(zSide);
+
+    // Blend across width:
+    const x = u * halfW;
+    const z = (1 - u2) * zCenter + u2 * zSide;
+    const y = (1 - u2) * yCenter + u2 * ySide - layer * thickness;
+
+    return new THREE.Vector3(x, y, z);
+  }
+
+  // Generate top (outer) surface vertices:
+  for (let iv = 0; iv <= nv; iv++) {
+    const v = iv / nv;
+    for (let iu = 0; iu <= nu; iu++) {
+      const u = (iu / nu) * 2 - 1; // -1 to 1
+      const p = evalPoint(u, v, 0);
+      positions.push(p.x, p.y, p.z);
+      uvs.push(u * 0.5 + 0.5, v);
+    }
+  }
+
+  // Generate bottom (inner) surface vertices:
+  const offset = (nu + 1) * (nv + 1);
+  for (let iv = 0; iv <= nv; iv++) {
+    const v = iv / nv;
+    for (let iu = 0; iu <= nu; iu++) {
+      const u = (iu / nu) * 2 - 1;
+      const p = evalPoint(u, v, 1);
+      positions.push(p.x, p.y, p.z);
+      uvs.push(u * 0.5 + 0.5, v);
+    }
+  }
+
+  // Top surface grid faces:
+  const rowStride = nu + 1;
+  for (let iv = 0; iv < nv; iv++) {
+    for (let iu = 0; iu < nu; iu++) {
+      const a = iv * rowStride + iu;
+      const b = (iv + 1) * rowStride + iu;
+      const c = (iv + 1) * rowStride + (iu + 1);
+      const d = iv * rowStride + (iu + 1);
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  // Bottom surface grid faces (reversed winding):
+  for (let iv = 0; iv < nv; iv++) {
+    for (let iu = 0; iu < nu; iu++) {
+      const a = offset + iv * rowStride + iu;
+      const b = offset + (iv + 1) * rowStride + iu;
+      const c = offset + (iv + 1) * rowStride + (iu + 1);
+      const d = offset + iv * rowStride + (iu + 1);
+      indices.push(a, d, b);
+      indices.push(b, d, c);
+    }
+  }
+
+  // Stitch front edge (v = 1):
+  const frontTopStart = nv * rowStride;
+  const frontBotStart = offset + nv * rowStride;
+  for (let iu = 0; iu < nu; iu++) {
+    const t0 = frontTopStart + iu;
+    const t1 = frontTopStart + iu + 1;
+    const b0 = frontBotStart + iu;
+    const b1 = frontBotStart + iu + 1;
+    indices.push(t0, t1, b0);
+    indices.push(t1, b1, b0);
+  }
+
+  // Stitch rear edge (v = 0):
+  for (let iu = 0; iu < nu; iu++) {
+    const t0 = iu;
+    const t1 = iu + 1;
+    const b0 = offset + iu;
+    const b1 = offset + iu + 1;
+    indices.push(t0, b0, t1);
+    indices.push(t1, b0, b1);
+  }
+
+  // Stitch left edge (u = -1 / iu = 0):
+  for (let iv = 0; iv < nv; iv++) {
+    const t0 = iv * rowStride;
+    const t1 = (iv + 1) * rowStride;
+    const b0 = offset + iv * rowStride;
+    const b1 = offset + (iv + 1) * rowStride;
+    indices.push(t0, b0, t1);
+    indices.push(t1, b0, b1);
+  }
+
+  // Stitch right edge (u = +1 / iu = nu):
+  for (let iv = 0; iv < nv; iv++) {
+    const t0 = iv * rowStride + nu;
+    const t1 = (iv + 1) * rowStride + nu;
+    const b0 = offset + iv * rowStride + nu;
+    const b1 = offset + (iv + 1) * rowStride + nu;
+    indices.push(t0, t1, b0);
+    indices.push(t1, b1, b0);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+
+/** Authentic stamped sheet-metal straight planar typebar. */
+function createStraightTypebarGeometry(barLength = 7.4): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  // 1. Pivot Fulcrum Eyelet Loop at Origin (0, 0)
+  const rPivot = 0.22;
+  shape.absarc(0, 0, rPivot, -Math.PI / 2, Math.PI / 2, false);
+
+  // 2. Straight Tapering Shank (Planar stamped steel blade)
+  shape.lineTo(0.048, barLength * 0.35);
+  shape.lineTo(0.038, barLength);
+
+  // 3. Slug Mounting Tip Top Edge
+  shape.lineTo(-0.038, barLength);
+
+  // 4. Return Path (Inner Edge)
+  shape.lineTo(-0.048, barLength * 0.35);
+  shape.lineTo(-rPivot, 0);
+  shape.closePath();
+
+  // Fulcrum pivot center hole
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, 0.08, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: 0.08, // Stamped sheet-metal gauge thickness
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.012,
+    bevelThickness: 0.012,
+  };
+
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geo.translate(0, 0, -0.04);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Authentic stamped sheet-steel key lever with horizontal beam and 90-degree curved elbow riser. */
+function createKeyLeverGeometry(dy: number, dz: number, thickness = 0.055): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  const beamH = 0.38;
+  const riserW = 0.28;
+
+  // 1. Rear pull tail top
+  shape.moveTo(-1.9, 0.22);
+  // 2. Pivot fulcrum top
+  shape.lineTo(0.0, 0.20);
+  // 3. Horizontal top edge of main lever beam
+  shape.lineTo(dz - riserW - 0.7, 0.18);
+  // 4. Inner 90-degree curved elbow rising up into key stem
+  shape.quadraticCurveTo(dz - riserW, 0.22, dz - riserW, Math.max(0.3, dy * 0.45));
+  shape.lineTo(dz - riserW, dy - 0.05);
+  // 5. Stem top mounting edge
+  shape.lineTo(dz, dy - 0.05);
+  // 6. Front vertical edge
+  shape.lineTo(dz, Math.max(0.3, dy * 0.45));
+  // 7. Outer 90-degree curved elbow turning down to bottom beam
+  shape.quadraticCurveTo(dz, -beamH, dz - riserW - 0.7, -beamH);
+  // 8. Horizontal bottom edge of main beam
+  shape.lineTo(0.0, -beamH);
+  // 9. Rear pull tail bottom
+  shape.lineTo(-1.9, -0.06);
+  shape.closePath();
+
+  // Fulcrum axle hole
+  const fulcrumHole = new THREE.Path();
+  fulcrumHole.absarc(0, 0, 0.09, 0, Math.PI * 2, true);
+  shape.holes.push(fulcrumHole);
+
+  // Rear pull link wire hole
+  const tailHole = new THREE.Path();
+  tailHole.absarc(-1.6, 0.08, 0.05, 0, Math.PI * 2, true);
+  shape.holes.push(tailHole);
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.012,
+    bevelThickness: 0.012,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  // Center along X-axis:
+  geo.translate(0, 0, -thickness / 2);
+  // Rotate so 2D (x=Z, y=Y) -> 3D (+Z, +Y, +X):
+  geo.rotateY(-Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Authentic vintage stamped sheet-metal ribbon spool flange disc with 4 curved window cutouts and drive pin holes. */
+function createRibbonSpoolFlangeGeometry(radius = 2.45, thickness = 0.065): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  // Outer perimeter disc
+  shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+
+  // 1. Center spindle arbor hole (r = 0.36)
+  const centerHole = new THREE.Path();
+  centerHole.absarc(0, 0, 0.36, 0, Math.PI * 2, true);
+  shape.holes.push(centerHole);
+
+  // 2. 4 Radially arrayed curved window cutouts (lightening ports)
+  const numPorts = 4;
+  const innerR = 0.92;
+  const outerR = 1.98;
+  const portAngle = (Math.PI * 2) / numPorts;
+  const gap = 0.32;
+
+  for (let i = 0; i < numPorts; i++) {
+    const aStart = i * portAngle + gap / 2;
+    const aEnd = (i + 1) * portAngle - gap / 2;
+    const port = new THREE.Path();
+    port.absarc(0, 0, innerR, aStart, aEnd, false);
+    port.absarc(0, 0, outerR, aEnd, aStart, true);
+    port.closePath();
+    shape.holes.push(port);
+  }
+
+  // 3. 3 Driving spindle pin notch holes
+  for (let i = 0; i < 3; i++) {
+    const a = (i * Math.PI * 2) / 3 + Math.PI / 6;
+    const pinHole = new THREE.Path();
+    pinHole.absarc(Math.cos(a) * 0.64, Math.sin(a) * 0.64, 0.085, 0, Math.PI * 2, true);
+    shape.holes.push(pinHole);
+  }
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.012,
+    bevelThickness: 0.012,
+    curveSegments: 36,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geo.translate(0, 0, -thickness / 2);
+  geo.rotateX(Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Lathed knurled brass/nickel thumb nut for spool retention. */
+function createKnurledNutGeometry(radius = 0.52, height = 0.32): THREE.BufferGeometry {
+  const points: THREE.Vector2[] = [
+    new THREE.Vector2(0.0, 0.0),
+    new THREE.Vector2(radius * 0.72, 0.0),
+    new THREE.Vector2(radius * 0.96, 0.04),
+    new THREE.Vector2(radius, 0.08),
+    new THREE.Vector2(radius, height - 0.08),
+    new THREE.Vector2(radius * 0.92, height - 0.02),
+    new THREE.Vector2(radius * 0.62, height),
+    new THREE.Vector2(0.0, height),
+  ];
+  const geo = new THREE.LatheGeometry(points, 32);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+let _woundRibbonTexture: THREE.CanvasTexture | null = null;
+/** Concentric wound woven cloth typewriter ribbon texture with fibrous grain and inking saturation. */
+function getWoundRibbonTexture(size = 512): THREE.CanvasTexture {
+  if (_woundRibbonTexture) return _woundRibbonTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // Dark oily inking base
+  ctx.fillStyle = "#0e0c10";
+  ctx.fillRect(0, 0, size, size);
+
+  // Top-half black ink, bottom-half rich typewriter crimson red (classic bichrome ribbon!)
+  const midY = size / 2;
+  ctx.fillStyle = "#141216";
+  ctx.fillRect(0, 0, size, midY);
+  ctx.fillStyle = "#480e14";
+  ctx.fillRect(0, midY, size, size - midY);
+
+  // Concentric winding layer lines and fibrous thread weave
+  let s = 171;
+  const rand = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+  for (let y = 0; y < size; y++) {
+    const isTop = y < midY;
+    const baseColor = isTop ? 18 : 64;
+    const val = baseColor + Math.floor((rand() - 0.5) * 16);
+    ctx.fillStyle = isTop ? `rgb(${val},${val},${val + 3})` : `rgb(${val + 24},${Math.floor(val * 0.25)},${Math.floor(val * 0.3)})`;
+    ctx.fillRect(0, y, size, 1);
+  }
+
+  // Vertical woven warp/weft cross-threads
+  for (let x = 0; x < size; x += 3) {
+    ctx.fillStyle = `rgba(255,255,255,0.045)`;
+    ctx.fillRect(x, 0, 1, size);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 1);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  _woundRibbonTexture = texture;
+  return texture;
+}
+
+/** Knurled vintage Bakelite / rubber platen hand wheel with axial grip flutes. */
+function createKnurledPlatenKnobGeometry(r = 1.25, len = 1.1): THREE.BufferGeometry {
+  const points: THREE.Vector2[] = [
+    new THREE.Vector2(0.0, 0.0),
+    new THREE.Vector2(r * 0.72, 0.0),
+    new THREE.Vector2(r * 0.95, 0.08),
+    new THREE.Vector2(r, 0.22),
+    new THREE.Vector2(r, len - 0.22),
+    new THREE.Vector2(r * 0.95, len - 0.08),
+    new THREE.Vector2(r * 0.72, len),
+    new THREE.Vector2(0.0, len),
+  ];
+  const geo = new THREE.LatheGeometry(points, 32);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+let _paperTableScaleTexture: THREE.CanvasTexture | null = null;
+/** Engraved silver column ruler scale texture for paper rest table (columns 0-80). */
+function getPaperTableScaleTexture(): THREE.CanvasTexture {
+  if (_paperTableScaleTexture) return _paperTableScaleTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+
+  // Satin steel backing
+  ctx.fillStyle = "#262628";
+  ctx.fillRect(0, 0, 1024, 128);
+
+  // Top silver ruler strip
+  ctx.fillStyle = "#3a3a3e";
+  ctx.fillRect(24, 14, 976, 56);
+  ctx.strokeStyle = "#7e7e84";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(24, 14, 976, 56);
+
+  // Column graduation ticks & numbers 0 to 80
+  ctx.fillStyle = "#dedee4";
+  ctx.font = '600 17px "Courier Prime", monospace';
+  ctx.textAlign = "center";
+
+  const totalCols = 80;
+  const startX = 48;
+  const endX = 976;
+  const colStep = (endX - startX) / totalCols;
+
+  for (let c = 0; c <= totalCols; c++) {
+    const x = startX + c * colStep;
+    const isMajor = c % 10 === 0;
+    const isMid = c % 5 === 0;
+    const tickH = isMajor ? 26 : isMid ? 18 : 10;
+
+    ctx.strokeStyle = isMajor ? "#f0f0f4" : "#9e9ea4";
+    ctx.lineWidth = isMajor ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 14);
+    ctx.lineTo(x, 14 + tickH);
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.fillText(String(c), x, 62);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  _paperTableScaleTexture = texture;
+  return texture;
+}
+
+/** Vintage Gold serif badge banner texture for front apron. */
+function buildGoldBadgeTexture(title = "PLATEN", subtitle = "3D MECHANICAL TYPEWRITER"): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 160;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#121214";
+  ctx.fillRect(0, 0, 1024, 160);
+
+  ctx.strokeStyle = "#c89d46";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(12, 12, 1000, 136);
+
+  ctx.strokeStyle = "#e8c36b";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(20, 20, 984, 120);
+
+  for (const [cx, cy] of [
+    [20, 20],
+    [1004, 20],
+    [20, 140],
+    [1004, 140],
+  ]) {
+    ctx.fillStyle = "#ffd572";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#e8c36b";
+  ctx.font = "bold 60px 'Cinzel', 'Playfair Display', 'Georgia', serif";
+  ctx.fillText(title, 512, 64);
+
+  ctx.fillStyle = "#ba964c";
+  ctx.font = "bold 22px 'Cinzel', 'Georgia', serif";
+  ctx.fillText(subtitle, 512, 120);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 /** Dynamic multi-segment ribbon strip mesh that supports real-time spline deformation and realistic cloth waviness. */
@@ -702,6 +1356,36 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
           label.position.y = 0.62;
           inner.add(label);
         }
+
+        // Underside vertical nickel key stem collar connecting down to lever riser
+        if (def.kind !== "space") {
+          const stemCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.45, 14), mats.nickel);
+          stemCollar.position.y = 0.02;
+          inner.add(stemCollar);
+
+          // Nickel clamping flange bracket connecting keycap to the vertical lever riser blade
+          const clampBracket = boxMesh(0.12, 0.38, 0.28, mats.nickel);
+          clampBracket.position.y = -0.10;
+          inner.add(clampBracket);
+
+          // Brass cross-rivet pin fastening keycap to lever riser
+          const rivet = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.24, 10), mats.brass);
+          rivet.rotation.z = Math.PI / 2;
+          rivet.position.y = -0.10;
+          inner.add(rivet);
+        } else {
+          // Spacebar dual mounting posts and rocker brackets
+          for (const sOffset of [-5.5, 5.5]) {
+            const spaceStem = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.65, 12), mats.nickel);
+            spaceStem.position.set(sOffset, -0.15, 0);
+            inner.add(spaceStem);
+
+            const spaceBracket = boxMesh(0.12, 0.55, 0.38, mats.nickel);
+            spaceBracket.position.set(sOffset, -0.25, 0);
+            inner.add(spaceBracket);
+          }
+        }
+
         return inner;
       },
     );
@@ -729,15 +1413,25 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         group.position.set(position.x, LEVER_PIVOT.y, LEVER_PIVOT.z);
         const inner = new THREE.Group();
         group.add(inner);
-        const armEnd = new THREE.Vector3(0, position.y - 0.7 - LEVER_PIVOT.y, position.z - LEVER_PIVOT.z);
-        const arm = rodBetween(new THREE.Vector3(0, 0, 0), armEnd, 0.09, mats.steelDark);
-        arm.castShadow = true;
-        inner.add(arm);
-        const rear = rodBetween(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.18, -1.9), 0.09, mats.steelDark);
-        inner.add(rear);
-        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 12), mats.nickel);
+
+        const dy = position.y - LEVER_PIVOT.y;
+        const dz = position.z - LEVER_PIVOT.z;
+
+        // Stamped sheet-steel keylever blade with 90-degree curved elbow riser
+        const leverMesh = new THREE.Mesh(createKeyLeverGeometry(dy, dz), mats.steelDark);
+        leverMesh.castShadow = true;
+        leverMesh.receiveShadow = true;
+        inner.add(leverMesh);
+
+        // Fulcrum pivot collar & brass bearing sleeve
+        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.45, 12), mats.nickel);
         collar.rotation.z = Math.PI / 2;
         inner.add(collar);
+
+        const bushing = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.52, 10), mats.brass);
+        bushing.rotation.z = Math.PI / 2;
+        inner.add(bushing);
+
         return inner;
       },
     );
@@ -765,20 +1459,6 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   /* ------------------------------ Typebars ------------------------------ */
 
-  const typebarAngle = (index: number): number =>
-    index === IME_TYPEBAR
-      ? THREE.MathUtils.degToRad(14)
-      : THREE.MathUtils.degToRad(20 + (index * 140) / (TYPEBAR_COUNT - 1));
-
-  const typebarPivot = (index: number): THREE.Vector3 => {
-    const angle = typebarAngle(index);
-    return new THREE.Vector3(
-      BASKET.cx + BASKET.r * Math.cos(angle),
-      BASKET.cy,
-      BASKET.cz + BASKET.r * Math.sin(angle),
-    );
-  };
-
   const buildTypebar = (
     index: number,
     labelTop: string,
@@ -786,14 +1466,11 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     upper: string,
     isIme: boolean,
   ): { pivot: THREE.Vector3; restAngle: number; yaw: number } => {
-    const pivot = typebarPivot(index);
-    const toPrint = PRINT_POINT.clone().sub(pivot);
-    const barLength = toPrint.length();
-    toPrint.normalize();
-    const flatDistance = Math.hypot(toPrint.x, toPrint.z);
-    const yaw = Math.atan2(toPrint.x, toPrint.z);
-    const strikeAngle = Math.atan2(flatDistance, toPrint.y);
-    const restAngle = strikeAngle + THREE.MathUtils.degToRad(72);
+    const slot = getBasketSlot(index);
+    const pivot = slot.position;
+    const barLength = slot.barLength;
+    const restPitch = 0;
+    const strikePitch = slot.swingAngle;
     const keyCode = isIme ? "IME" : KEYS.find((k) => k.typebar === index)!.code;
 
     const { action } = addPart(
@@ -805,10 +1482,10 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         system: "typebars",
         stagger: 0.44 + index * 0.0018,
         offset: {
-          px: Math.cos(typebarAngle(index)) * 3.2,
+          px: pivot.x * 0.35,
           py: 1.8,
-          pz: Math.sin(typebarAngle(index)) * 3.2,
-          ry: (typebarAngle(index) - Math.PI / 2) * 0.35,
+          pz: pivot.z * 0.35,
+          ry: slot.angle * 0.35,
         },
         parentId: null,
         upstream: isIme ? [] : [`link.${keyCode}`],
@@ -816,37 +1493,64 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       },
       (group) => {
         group.position.copy(pivot);
-        group.rotation.order = "YXZ";
-        group.rotation.y = yaw;
-        group.rotation.x = restAngle;
+        group.quaternion.copy(slot.orientation);
         const inner = new THREE.Group();
         group.add(inner);
-        const bar = boxMesh(0.2, barLength, 0.4, isIme ? mats.brass : mats.nickel);
-        bar.position.y = barLength / 2;
-        bar.castShadow = true;
-        inner.add(bar);
-        const tail = boxMesh(0.18, 1.4, 0.36, mats.steelDark);
-        tail.position.y = -0.7;
+
+        // 1. Authentic Stamped Sheet-Metal Straight Planar Typebar
+        const barGeo = createStraightTypebarGeometry(barLength);
+        const barMesh = new THREE.Mesh(barGeo, isIme ? mats.brass : mats.steelDark);
+        barMesh.castShadow = true;
+        inner.add(barMesh);
+
+        // Actuation tail extending beneath pivot
+        const tail = boxMesh(0.08, 0.85, 0.22, mats.steelDark);
+        tail.position.set(0, -0.42, 0);
         inner.add(tail);
-        const slugBlock = boxMesh(0.52, 0.72, 0.34, mats.steelDark);
-        slugBlock.position.y = barLength + 0.2;
-        slugBlock.rotation.x = -1.15;
-        inner.add(slugBlock);
+
+        // 2. Soldered Dual-Character Slug Die Head (Directly on straight tip)
+        const slugGroup = new THREE.Group();
+        slugGroup.position.set(0, barLength, 0.04);
+
+        // Target orientation at impact so slug die face meets rubber platen flush:
+        const strikeRot = new THREE.Matrix4().multiplyMatrices(
+          slot.basisMatrix,
+          new THREE.Matrix4().makeRotationX(slot.swingAngle),
+        );
+        const invStrikeRot = strikeRot.clone().invert();
+        const targetWorldMat = new THREE.Matrix4().makeBasis(
+          new THREE.Vector3(1, 0, 0),
+          new THREE.Vector3(0, 0.97, 0.24),
+          new THREE.Vector3(0, -0.24, 0.97),
+        );
+        const localSlugMat = new THREE.Matrix4().multiplyMatrices(invStrikeRot, targetWorldMat);
+        slugGroup.quaternion.setFromRotationMatrix(localSlugMat);
+
+        // Die block body
+        const slugBox = boxMesh(0.24, 0.42, 0.18, mats.nickel);
+        slugGroup.add(slugBox);
+
+        // Embossed character die face with dividing groove
         const slugFace = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.44, 0.6),
+          new THREE.PlaneGeometry(0.20, 0.36),
           new THREE.MeshBasicMaterial({ map: slugTexture(lower, upper) }),
         );
-        slugFace.position.set(0, barLength + 0.2, 0.18);
-        slugFace.rotation.x = -1.15;
-        inner.add(slugFace);
+        slugFace.position.set(0, 0, 0.095);
+        slugGroup.add(slugFace);
+
+        const groove = boxMesh(0.22, 0.02, 0.02, mats.steelDark);
+        groove.position.set(0, 0, 0.10);
+        slugGroup.add(groove);
+
+        inner.add(slugGroup);
         return inner;
       },
     );
 
     refs.typebarActions[index] = action!;
-    refs.typebarRestAngles[index] = restAngle;
-    refs.typebarStrikeAngles[index] = strikeAngle;
-    return { pivot, restAngle, yaw };
+    refs.typebarRestAngles[index] = restPitch;
+    refs.typebarStrikeAngles[index] = strikePitch;
+    return { pivot, restAngle: restPitch, yaw: slot.angle };
   };
 
   const typebarInfo: Array<{ pivot: THREE.Vector3; restAngle: number; yaw: number } | undefined> = [];
@@ -860,12 +1564,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   for (const def of KEYS) {
     if (def.kind !== "char") continue;
-    const info = typebarInfo[def.typebar]!;
-    const tailDirection = new THREE.Vector3(0, -Math.cos(info.restAngle), -Math.sin(info.restAngle)).applyAxisAngle(
-      new THREE.Vector3(0, 1, 0),
-      info.yaw,
-    );
-    const tailPoint = info.pivot.clone().addScaledVector(tailDirection, 1.4);
+    const slot = getBasketSlot(def.typebar);
+    const tailPoint = slot.position.clone().addScaledVector(slot.restDir, -0.45);
     const keyPos = keyPosition(def);
     const leverEnd = new THREE.Vector3(keyPos.x, LEVER_PIVOT.y + 0.2, LEVER_PIVOT.z - 1.9);
     addPart(
@@ -881,9 +1581,9 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         downstream: [`typebar.${def.typebar}`],
       },
       (group) => {
-        const rod = rodBetween(leverEnd, tailPoint, 0.055, mats.nickel, 6);
+        const rod = rodBetween(leverEnd, tailPoint, 0.038, mats.nickel, 6);
         group.add(rod);
-        const joint = rodBetween(tailPoint.clone().add(new THREE.Vector3(0, -0.5, 0)), tailPoint, 0.09, mats.brass, 6);
+        const joint = rodBetween(tailPoint.clone().add(new THREE.Vector3(0, -0.35, 0)), tailPoint, 0.065, mats.brass, 6);
         group.add(joint);
         return null;
       },
@@ -897,19 +1597,179 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     {
       id: "basket.segment",
       label: "Typebar segment",
-      fn: "Slotted arc guiding every typebar pivot",
+      fn: "Rear upright slotted cast-iron segment deck anchoring and guiding all 44 typebar pivots",
       system: "basket",
       stagger: 0.56,
-      offset: { py: -2.2 },
+      offset: { py: -2.0 },
       downstream: ["typebars"],
     },
     (group) => {
-      group.position.set(BASKET.cx, BASKET.cy - 0.3, BASKET.cz);
-      const arc = Math.PI * 0.95;
-      const segment = new THREE.Mesh(new THREE.TorusGeometry(BASKET.r, 0.3, 10, 48, arc), mats.enamel);
-      segment.rotation.x = Math.PI / 2;
-      segment.rotation.z = Math.PI - arc / 2;
-      group.add(segment);
+      // 1. Upright Flat Cast-Iron Segment Mantle Plate standing flat against the platen / ribbon vibrator
+      const segmentShape = new THREE.Shape();
+      const total = BASKET_CONFIG.total;
+      const cy = BASKET_CONFIG.cy;
+      const rInner = BASKET_CONFIG.radius - 0.35;
+      const rOuter = BASKET_CONFIG.radius + 1.25;
+      const maxPhi = (70 * Math.PI) / 180;
+
+      // Outer boundary arc from right ear to left ear
+      const segSteps = 32;
+      for (let s = 0; s <= segSteps; s++) {
+        const u = s / segSteps;
+        const phi = maxPhi * (1 - 2 * u); // from +maxPhi to -maxPhi
+        const x = rOuter * Math.sin(phi);
+        const y = cy - rOuter * Math.cos(phi);
+        if (s === 0) segmentShape.moveTo(x, y);
+        else segmentShape.lineTo(x, y);
+      }
+
+      // Left ear top notch
+      const leftEarPhi = -maxPhi;
+      const leftEarX = rOuter * Math.sin(leftEarPhi);
+      const leftEarY = cy - rOuter * Math.cos(leftEarPhi);
+      segmentShape.lineTo(leftEarX - 0.4, leftEarY + 0.3);
+      segmentShape.lineTo(rInner * Math.sin(leftEarPhi) - 0.4, cy - rInner * Math.cos(leftEarPhi) + 0.3);
+
+      // Inner boundary arc from left ear to right ear
+      for (let s = 0; s <= segSteps; s++) {
+        const u = s / segSteps;
+        const phi = -maxPhi + 2 * maxPhi * u; // from -maxPhi to +maxPhi
+        const x = rInner * Math.sin(phi);
+        const y = cy - rInner * Math.cos(phi);
+        segmentShape.lineTo(x, y);
+      }
+
+      // Right ear top notch
+      const rightEarPhi = maxPhi;
+      segmentShape.lineTo(rInner * Math.sin(rightEarPhi) + 0.4, cy - rInner * Math.cos(rightEarPhi) + 0.3);
+      segmentShape.lineTo(leftEarX * -1 + 0.4, leftEarY + 0.3);
+      segmentShape.closePath();
+
+      const segmentPlateGeo = new THREE.ExtrudeGeometry(segmentShape, {
+        depth: 0.32,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        steps: 1,
+        bevelSize: 0.04,
+        bevelThickness: 0.04,
+      });
+      const segmentPlate = new THREE.Mesh(segmentPlateGeo, mats.castIron);
+      segmentPlate.position.set(0, 0, BASKET_CONFIG.cz - 0.28);
+      segmentPlate.castShadow = true;
+      segmentPlate.receiveShadow = true;
+      group.add(segmentPlate);
+
+      // 2. Sub-segment Deck / Enclosing Throat Shield covering behind keyboard
+      const deckShieldShape = new THREE.Shape();
+      deckShieldShape.moveTo(-7.4, 0);
+      deckShieldShape.lineTo(7.4, 0);
+      deckShieldShape.lineTo(6.2, 4.6);
+      deckShieldShape.lineTo(-6.2, 4.6);
+      deckShieldShape.closePath();
+
+      const deckShieldGeo = new THREE.ExtrudeGeometry(deckShieldShape, {
+        depth: 0.22,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        steps: 1,
+        bevelSize: 0.03,
+        bevelThickness: 0.03,
+      });
+      const deckShield = new THREE.Mesh(deckShieldGeo, mats.castIron);
+      deckShield.rotation.x = Math.PI * 0.42;
+      deckShield.position.set(0, 5.5, -0.9);
+      deckShield.castShadow = true;
+      deckShield.receiveShadow = true;
+      group.add(deckShield);
+
+      // 3. 44 Machined Radial Comb Guide Slots & Flanking Teeth
+      for (let i = 0; i < total; i++) {
+        const slot = getBasketSlot(i);
+        
+        // Left and Right milled comb tooth flanking each typebar pivot
+        for (const sideOffset of [-0.038, 0.038]) {
+          const tooth = boxMesh(0.024, 0.52, 0.30, mats.steelDark);
+          tooth.position.copy(slot.position);
+          tooth.quaternion.copy(slot.orientation);
+          tooth.translateX(sideOffset);
+          tooth.translateY(-0.06);
+          tooth.castShadow = true;
+          group.add(tooth);
+        }
+
+        // Slotted base trough backing block
+        const toothBack = boxMesh(0.08, 0.18, 0.28, mats.castIron);
+        toothBack.position.copy(slot.position);
+        toothBack.quaternion.copy(slot.orientation);
+        toothBack.translateY(-0.24);
+        group.add(toothBack);
+      }
+
+      // 4. Continuous Nickel Fulcrum Hinge Wire threading all 44 typebar pivot eyelets
+      const wirePoints: THREE.Vector3[] = [];
+      for (let i = 0; i < total; i++) {
+        wirePoints.push(getBasketSlot(i).position);
+      }
+      const wireCurve = new THREE.CatmullRomCurve3(wirePoints);
+      const wireGeo = new THREE.TubeGeometry(wireCurve, 44, 0.045, 8, false);
+      const wireMesh = new THREE.Mesh(wireGeo, mats.nickel);
+      group.add(wireMesh);
+
+      // 5. Polished Nickel Fulcrum Wire Clamp Plates and Fastener Screws on Left and Right Ears
+      for (const side of [-1, 1]) {
+        const earSlot = getBasketSlot(side < 0 ? 0 : total - 1);
+        const clampPlate = boxMesh(0.55, 0.95, 0.16, mats.nickel);
+        clampPlate.position.set(earSlot.position.x + side * 0.28, earSlot.position.y + 0.15, earSlot.position.z + 0.08);
+        clampPlate.quaternion.copy(earSlot.orientation);
+        group.add(clampPlate);
+
+        const clampScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 14), mats.nickel);
+        clampScrew.position.set(earSlot.position.x + side * 0.28, earSlot.position.y + 0.15, earSlot.position.z + 0.16);
+        clampScrew.rotation.x = Math.PI / 2;
+        group.add(clampScrew);
+      }
+
+      // 6. Central Mounting Boss & Lower Segment Bracket
+      const lowerMountingPlate = boxMesh(3.8, 1.4, 0.45, mats.castIron);
+      lowerMountingPlate.position.set(0, 6.4, -1.22);
+      group.add(lowerMountingPlate);
+
+      for (const side of [-1, 1]) {
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 14), mats.nickel);
+        screw.position.set(side * 1.1, 6.4, -0.96);
+        screw.rotation.x = Math.PI / 2;
+        group.add(screw);
+      }
+
+      return null;
+    },
+  );
+
+  addPart(
+    basketGroup,
+    {
+      id: "basket.centerGuide",
+      label: "Center type guide",
+      fn: "Fixed mirror-nickel V-guide centering each typebar at impact",
+      system: "basket",
+      stagger: 0.59,
+      offset: { pz: -1.0 },
+    },
+    (group) => {
+      group.position.set(0, 13.8, -1.48);
+
+      // Central mounting bracket stem
+      const stem = boxMesh(0.35, 1.2, 0.24, mats.nickel);
+      stem.position.set(0, -0.5, 0);
+      group.add(stem);
+
+      // Twin polished nickel funneling wings forming the V-notch
+      for (const side of [-1, 1]) {
+        const wing = boxMesh(0.12, 0.95, 0.28, mats.nickel);
+        wing.position.set(side * 0.28, 0.2, 0);
+        wing.rotation.z = side * -0.26;
+        group.add(wing);
+      }
       return null;
     },
   );
@@ -919,17 +1779,30 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     {
       id: "basket.rest",
       label: "Typebar rest",
-      fn: "Felt rail where idle typebars sleep",
+      fn: "U-shaped wool felt rail where idle typebars sleep",
       system: "basket",
       stagger: 0.57,
-      offset: { py: -2.6 },
+      offset: { py: -2.4 },
     },
     (group) => {
-      group.position.set(BASKET.cx, BASKET.cy - 1.6, BASKET.cz + 1.2);
-      const arc = Math.PI * 0.9;
-      const rest = new THREE.Mesh(new THREE.TorusGeometry(BASKET.r - 0.8, 0.24, 8, 40, arc), mats.felt);
-      rest.rotation.x = Math.PI / 2;
-      group.add(rest);
+      const restPoints: THREE.Vector3[] = [];
+      const total = BASKET_CONFIG.total;
+      for (let i = 0; i < total; i++) {
+        const slot = getBasketSlot(i);
+        const restPoint = slot.position.clone().addScaledVector(slot.restDir, slot.barLength * 0.94);
+        restPoints.push(restPoint);
+      }
+      const restCurve = new THREE.CatmullRomCurve3(restPoints);
+      const restMesh = new THREE.Mesh(new THREE.TubeGeometry(restCurve, 44, 0.12, 8, false), mats.felt);
+      group.add(restMesh);
+
+      // Nickel end mounting brackets
+      for (const side of [-1, 1]) {
+        const endP = restPoints[side < 0 ? 0 : total - 1];
+        const bracket = boxMesh(0.35, 0.65, 0.4, mats.nickel);
+        bracket.position.set(endP.x + side * 0.12, endP.y - 0.2, endP.z);
+        group.add(bracket);
+      }
       return null;
     },
   );
@@ -1292,16 +2165,29 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       (group) => {
         group.position.set(side * (PLATEN.len / 2 + 1.3), PLATEN.y, PLATEN.z);
 
-        // Knurled hand wheel with grip ridges
-        const knob = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.25, 1.0, 24), mats.keyRim);
-        knob.rotation.z = Math.PI / 2;
+        // Knurled Bakelite/rubber hand wheel with authentic grip flutes
+        const knob = new THREE.Mesh(createKnurledPlatenKnobGeometry(1.30, 0.95), mats.keyRim);
+        knob.rotation.z = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         knob.castShadow = true;
         group.add(knob);
 
-        // Central brass retention hub
-        const brassCap = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 16), mats.brass);
+        // Fluted perimeter grip ridges
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * Math.PI * 2;
+          const ridge = boxMesh(0.12, 0.16, 0.70, mats.steelDark);
+          ridge.position.set(side * 0.15, Math.cos(a) * 1.26, Math.sin(a) * 1.26);
+          ridge.rotation.x = a;
+          group.add(ridge);
+        }
+
+        // Central polished brass retention collar and hub screw
+        const brassCap = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 1.05, 18), mats.brass);
         brassCap.rotation.z = Math.PI / 2;
         group.add(brassCap);
+
+        const hubScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.15, 12), mats.nickel);
+        hubScrew.rotation.z = Math.PI / 2;
+        group.add(hubScrew);
         return null;
       },
     );
@@ -1376,67 +2262,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     refs.returnLeverAction = action!;
   }
 
-  addPart(
-    carriageGroup,
-    {
-      id: "carriage.paperBail",
-      label: "Paper bail",
-      fn: "Holds the sheet flat against the platen",
-      system: "carriage",
-      stagger: 0.79,
-      offset: { py: 1.6, pz: 1.6 },
-      parentId: "carriage.body",
-      upstream: [],
-      downstream: ["paper.sheet"],
-    },
-    (group) => {
-      // Paper bail crossbar positioned strictly on the OUTSIDE / FRONT (+Z) of the paper sheet
-      const paperWidth = 21.0;
-      const cy = PLATEN.y;
-      const cz = PLATEN.z;
-      const bailRadiusOffset = PLATEN.r + 0.36; // 1.9 + 0.36 = 2.26
-      const bailY = PLATEN.y + bailRadiusOffset * 0.72; // ~16.22
-      const bailZ = -1.48; // Clean +Z clearance on the FRONT of the paper
 
-      group.position.set(0, bailY, bailZ);
-
-      // Polished mirror nickel crossbar
-      const barGeom = new THREE.CylinderGeometry(0.08, 0.08, paperWidth + 0.6, 16);
-      const bar = new THREE.Mesh(barGeom, mats.nickel);
-      bar.rotation.z = Math.PI / 2;
-      bar.castShadow = true;
-      group.add(bar);
-
-      // Twin black rubber pinch rollers clamping onto the front of the paper
-      const rollerRadius = 0.18;
-      for (const side of [-1, 1]) {
-        const xPos = side * paperWidth * 0.32; // ±6.72
-        const rollerGeom = new THREE.CylinderGeometry(rollerRadius, rollerRadius, 0.65, 16);
-        const roller = new THREE.Mesh(rollerGeom, mats.rubber);
-        roller.position.set(xPos, 0, 0);
-        roller.rotation.z = Math.PI / 2;
-        roller.castShadow = true;
-        group.add(roller);
-      }
-
-      // Left & right pivot arms extending from carriage end-plates (platen axle) up to bail bar
-      for (const side of [-1, 1]) {
-        const armOrigin = new THREE.Vector3(side * 11.2, cy - bailY, cz - bailZ);
-        const armTarget = new THREE.Vector3(side * (paperWidth + 0.6) / 2, 0, 0);
-        const arm = rodBetween(armOrigin, armTarget, 0.12, mats.nickel);
-        arm.castShadow = true;
-        group.add(arm);
-
-        // Brass pivot screw cap at platen axle
-        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 14), mats.brass);
-        screw.position.copy(armOrigin);
-        screw.rotation.z = Math.PI / 2;
-        group.add(screw);
-      }
-
-      return null;
-    },
-  );
 
   for (const x of [-7, 7]) {
     addPart(
@@ -1486,31 +2312,52 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
   {
     const { action } = addPart(
-      carriageGroup,
+      root,
       {
         id: "carriage.bell",
-        label: "Margin bell",
+        label: "Margin warning bell",
         fn: "Rings six characters before the right margin",
-        system: "carriage",
+        system: "frame",
         stagger: 0.82,
-        offset: { px: -1.6, py: 1.2 },
-        parentId: "carriage.body",
-        upstream: ["carriage.body"],
+        offset: { px: -2.0, py: -1.2 },
+        upstream: ["carriage.marginStopR"],
         downstream: [],
       },
       (group) => {
-        group.position.set(-9.6, 15.9, -5);
+        group.position.set(-9.6, 5.8, -5.6);
         const inner = new THREE.Group();
         group.add(inner);
+
+        // Polished resonant brass gong dome
         const dome = new THREE.Mesh(
-          new THREE.SphereGeometry(0.85, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+          new THREE.SphereGeometry(1.25, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.48),
           mats.bellMetal,
         );
+        dome.rotation.x = Math.PI; // Inverted saucer gong
         dome.castShadow = true;
         inner.add(dome);
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.25, 20), mats.steelDark);
-        base.position.y = -0.1;
-        inner.add(base);
+
+        // Center mounting stud & nickel screw cap
+        const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.65, 14), mats.steelDark);
+        stud.position.y = 0.2;
+        inner.add(stud);
+
+        const screwCap = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.12, 14), mats.nickel);
+        screwCap.position.y = 0.52;
+        inner.add(screwCap);
+
+        // Chassis bridge mounting bracket arm
+        const bracket = rodBetween(new THREE.Vector3(0, 0.2, 0), new THREE.Vector3(1.4, 0.2, -0.9), 0.14, mats.steelDark);
+        group.add(bracket);
+
+        // Spring-loaded striker clapper hammer ball
+        const clapperArm = rodBetween(new THREE.Vector3(0.6, 0.2, 0), new THREE.Vector3(1.2, 0.5, 0.4), 0.06, mats.nickel);
+        group.add(clapperArm);
+
+        const clapperBall = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), mats.nickel);
+        clapperBall.position.set(1.2, 0.5, 0.4);
+        group.add(clapperBall);
+
         return inner;
       },
     );
@@ -1539,9 +2386,14 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       group.position.set(0, centerY, centerZ);
 
-      // Single rigid rectangular sheet resting beneath the paper
+      // Single rigid rectangular sheet resting beneath the paper with engraved column ruler
+      const tableMat = new THREE.MeshStandardMaterial({
+        map: getPaperTableScaleTexture(),
+        roughness: 0.58,
+        metalness: 0.65,
+      });
       const tableGeo = new THREE.BoxGeometry(TABLE_WIDTH, TABLE_LENGTH, 0.1);
-      const table = new THREE.Mesh(tableGeo, mats.steelDark);
+      const table = new THREE.Mesh(tableGeo, tableMat);
       table.rotation.x = -TILT_ANGLE; // Tilts backward (-Z)
       table.castShadow = true;
       table.receiveShadow = true;
@@ -1654,7 +2506,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   /* ------------------------------- Ribbon ------------------------------- */
 
   const SPOOL_Y = 13.25;
-  const SPOOL_X = 8.0;
+  const SPOOL_X = 9.8;
   const SPOOL_Z = 0.5;
   for (const side of [-1, 1]) {
     const { action } = addPart(
@@ -1674,38 +2526,94 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         const inner = new THREE.Group();
         group.add(inner);
 
-        // Core cylindrical wound ribbon pack
-        const ribbonCore = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.05, 0.44, 28), mats.ribbon);
+        // 1. Top stamped sheet-metal flange disc with 4 curved window cutouts and drive pin holes
+        const topFlange = new THREE.Mesh(createRibbonSpoolFlangeGeometry(2.45, 0.065), mats.steelDark);
+        topFlange.position.y = 0.58;
+        topFlange.castShadow = true;
+        inner.add(topFlange);
+
+        // Top flange rolled outer rim ring
+        const topRim = new THREE.Mesh(new THREE.TorusGeometry(2.44, 0.045, 8, 36), mats.nickel);
+        topRim.rotation.x = Math.PI / 2;
+        topRim.position.y = 0.58;
+        inner.add(topRim);
+
+        // 2. Bottom stamped sheet-metal flange disc with matching cutouts
+        const bottomFlange = new THREE.Mesh(createRibbonSpoolFlangeGeometry(2.45, 0.065), mats.steelDark);
+        bottomFlange.position.y = -0.58;
+        bottomFlange.castShadow = true;
+        inner.add(bottomFlange);
+
+        const bottomRim = new THREE.Mesh(new THREE.TorusGeometry(2.44, 0.045, 8, 36), mats.nickel);
+        bottomRim.rotation.x = Math.PI / 2;
+        bottomRim.position.y = -0.58;
+        inner.add(bottomRim);
+
+        // 3. Central wound inked cloth ribbon core (textured bichrome ribbon roll)
+        const woundRibbonMat = new THREE.MeshStandardMaterial({
+          map: getWoundRibbonTexture(),
+          normalMap: mats.ribbon.normalMap,
+          normalScale: new THREE.Vector2(0.8, 0.8),
+          roughness: 0.88,
+          metalness: 0.05,
+        });
+        const ribbonCore = new THREE.Mesh(new THREE.CylinderGeometry(2.15, 2.15, 1.10, 36), woundRibbonMat);
         ribbonCore.castShadow = true;
         inner.add(ribbonCore);
 
-        // Outer wound ribbon layer visibly wrapping the spool perimeter
-        const wrapAngle = Math.PI * 1.55;
-        const outerWrap = new THREE.Mesh(
-          new THREE.CylinderGeometry(2.08, 2.08, 0.50, 32, 1, true, side < 0 ? 0 : -Math.PI * 0.55, wrapAngle),
-          mats.ribbon,
-        );
-        inner.add(outerWrap);
+        // Inner cylindrical slotted steel core drum
+        const coreDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 0.92, 1.16, 24), mats.steelDark);
+        inner.add(coreDrum);
 
-        for (const y of [-0.3, 0.3]) {
-          const flange = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.08, 28), mats.steelDark);
-          flange.position.y = y;
-          inner.add(flange);
-        }
-        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1, 10), mats.nickel);
+        // Ribbon anchor clip & fastener rivet on the core drum
+        const anchorClip = boxMesh(0.12, 1.05, 0.42, mats.nickel);
+        anchorClip.position.set(0.88, 0, 0);
+        inner.add(anchorClip);
+
+        const anchorRivet = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.22, 10), mats.brass);
+        anchorRivet.rotation.z = Math.PI / 2;
+        anchorRivet.position.set(0.92, 0, 0);
+        inner.add(anchorRivet);
+
+        // 4. Center drive spindle arbor
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.55, 16), mats.steelDark);
         inner.add(hub);
-        const topNut = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.22, 16), mats.nickel);
-        topNut.position.y = 0.42;
-        inner.add(topNut);
 
-        // Deck guide post / tension roller guiding ribbon off the spool
-        const guidePost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.75, 14), mats.nickel);
-        guidePost.position.set(side * -2.15, 0, 0.05);
+        // 5. Polished knurled brass / nickel thumb retainer nut on top
+        const knurledNut = new THREE.Mesh(createKnurledNutGeometry(0.52, 0.32), mats.nickel);
+        knurledNut.position.y = 0.62;
+        inner.add(knurledNut);
+
+        const nutScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 14), mats.brass);
+        nutScrew.position.y = 0.94;
+        inner.add(nutScrew);
+
+        // 6. Under-spool driving ratchet plate with 3 drive pins
+        const ratchetDriver = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.14, 12), mats.steelDark);
+        ratchetDriver.position.y = -0.68;
+        inner.add(ratchetDriver);
+
+        for (let i = 0; i < 3; i++) {
+          const a = (i * Math.PI * 2) / 3 + Math.PI / 6;
+          const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.25, 10), mats.nickel);
+          pin.position.set(Math.cos(a) * 0.64, -0.58, Math.sin(a) * 0.64);
+          inner.add(pin);
+        }
+
+        // 7. Spool reverse sensing trip finger arm
+        const tripArm = boxMesh(0.08, 0.45, 1.15, mats.nickel);
+        tripArm.position.set(side * 1.45, 0, 0.25);
+        tripArm.rotation.y = side * 0.35;
+        group.add(tripArm);
+
+        // 8. Deck guide post / tension roller guiding ribbon off the spool towards center
+        const guidePost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.25, 14), mats.nickel);
+        guidePost.position.set(side * -2.35, 0, 0.05);
         group.add(guidePost);
 
-        for (const y of [-0.32, 0.32]) {
-          const guideFlange = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 14), mats.steelDark);
-          guideFlange.position.set(side * -2.15, y, 0.05);
+        for (const y of [-0.60, 0.60]) {
+          const guideFlange = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 14), mats.steelDark);
+          guideFlange.position.set(side * -2.35, y, 0.05);
           group.add(guideFlange);
         }
 
@@ -1810,7 +2718,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
         // Rear actuator link rod positioned cleanly behind the segment frame (Z <= -2.2)
         const rearActuatorRod = rodBetween(
           new THREE.Vector3(0, -0.3, 0),
-          new THREE.Vector3(0, -1.2, -1.0), // Reaches back behind the segment casting (global Z = -2.36)
+          new THREE.Vector3(0, -1.2, -1.0),
           0.12,
           mats.nickel,
         );
@@ -1818,7 +2726,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
         const verticalGuideRod = rodBetween(
           new THREE.Vector3(0, -1.2, -1.0),
-          new THREE.Vector3(0, -7.9, -1.0), // Extends down behind segment to lower chassis escapement/universal trip horn (Y=5.2, Z=-2.36)
+          new THREE.Vector3(0, -7.9, -1.0),
           0.1,
           mats.nickel,
         );
@@ -1830,11 +2738,13 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     refs.vibratorAction = action!;
   }
 
-  refs.ribbonSideL = createDynamicRibbonMesh(mats.ribbon, 32);
+  refs.ribbonSideL = createDynamicRibbonMesh(mats.ribbon, 36);
+  refs.ribbonSideL.name = "ribbon.strip.left";
   refs.ribbonSideL.userData.partId = "ribbon.strip";
   root.add(refs.ribbonSideL);
 
-  refs.ribbonSideR = createDynamicRibbonMesh(mats.ribbon, 32);
+  refs.ribbonSideR = createDynamicRibbonMesh(mats.ribbon, 36);
+  refs.ribbonSideR.name = "ribbon.strip.right";
   refs.ribbonSideR.userData.partId = "ribbon.strip";
   root.add(refs.ribbonSideR);
 
@@ -1872,14 +2782,14 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       // Group for rotating cross-shaft components lowered safely under the basket
       const gearGroup = new THREE.Group();
       gearGroup.position.set(0, 5.2, -3.6);
-      
-      const driveShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 16.2, 16), mats.steelDark);
+
+      const driveShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 20.0, 16), mats.steelDark);
       driveShaft.rotation.z = Math.PI / 2;
       gearGroup.add(driveShaft);
 
       const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.2, 0.28, 14), mats.brass);
       miterGearH.rotation.z = Math.PI / 2;
-      miterGearH.position.set(7.7, 0, 0);
+      miterGearH.position.set(9.5, 0, 0);
       gearGroup.add(miterGearH);
 
       const ratchetWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 18), mats.brass);
@@ -1899,15 +2809,15 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       // Group for right vertical spindle components extending from Y = 5.2 up to spool height Y = 13.25
       const spindleGroup = new THREE.Group();
-      spindleGroup.position.set(8.0, 5.2, -1.2);
-      
+      spindleGroup.position.set(SPOOL_X, 5.2, -1.2);
+
       const rightSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 8.2, 14), mats.steelDark);
       rightSpoolSpindle.position.set(0, 4.1, 0);
       spindleGroup.add(rightSpoolSpindle);
 
       const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
       spindleGroup.add(miterGearV);
-      
+
       group.add(spindleGroup);
       refs.ribbonAdvanceSpindle = spindleGroup;
 
@@ -1936,7 +2846,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       refs.ribbonAdvanceRocker = rockerGroup;
 
       // Bearing pillow block brackets anchoring the cross-shaft to the chassis frame
-      for (const xBracket of [-7.6, 0, 7.6]) {
+      for (const xBracket of [-9.4, 0, 9.4]) {
         const pillowBlock = boxMesh(0.55, 1.2, 0.7, mats.steelDark);
         pillowBlock.position.set(xBracket, 4.8, -3.6);
         group.add(pillowBlock);
@@ -1972,7 +2882,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
     (group) => {
       // Left vertical spool spindle shaft connecting left spool to cross-shaft
       const spindleGroup = new THREE.Group();
-      spindleGroup.position.set(-8.0, 5.2, -1.2);
+      spindleGroup.position.set(-SPOOL_X, 5.2, -1.2);
 
       const leftSpoolSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 8.2, 14), mats.steelDark);
       leftSpoolSpindle.position.set(0, 4.1, 0);
@@ -1980,37 +2890,37 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
 
       const miterGearV = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
       spindleGroup.add(miterGearV);
-      
+
       group.add(spindleGroup);
       refs.ribbonReverseSpindle = spindleGroup;
 
       // Left miter bevel gear pair transferring rotation to vertical spindle
       const gearGroup = new THREE.Group();
-      gearGroup.position.set(-7.7, 5.2, -3.6);
-      
+      gearGroup.position.set(-9.5, 5.2, -3.6);
+
       const miterGearH = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.28, 14), mats.brass);
       miterGearH.rotation.z = Math.PI / 2;
       gearGroup.add(miterGearH);
-      
+
       group.add(gearGroup);
       refs.ribbonReverseGear = gearGroup;
 
       // Left and Right Ribbon Reverse Sensing Arms (Pawls) extending through deck slots
       for (const side of [-1, 1]) {
-        // Spool edge guide bracket
+        // Spool edge guide bracket connecting to the inner perimeter of the moved spool
         const mount = boxMesh(0.35, 0.85, 0.45, mats.steelDark);
-        mount.position.set(side * 6.8, 12.4, 0.5);
+        mount.position.set(side * 8.6, 12.4, 0.5);
         group.add(mount);
 
         // Sensing contact fork that trips when ribbon eyelet catches
         const fork = boxMesh(0.16, 0.9, 0.35, mats.nickel);
-        fork.position.set(side * 6.6, 13.0, 0.5);
+        fork.position.set(side * 8.4, 13.0, 0.5);
         group.add(fork);
 
         // Side vertical dropper rod running down the outer perimeter to floor level:
         const dropperRod = rodBetween(
-          new THREE.Vector3(side * 6.8, 12.2, 0.5),
-          new THREE.Vector3(side * 6.8, 5.4, -3.6),
+          new THREE.Vector3(side * 8.6, 12.2, 0.5),
+          new THREE.Vector3(side * 8.6, 5.4, -3.6),
           0.08,
           mats.steelDark,
         );
@@ -2018,7 +2928,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       }
 
       // Low-level transverse shifter rod parallel to the ribbon advance drive shaft
-      const shiftLink = boxMesh(14.0, 0.16, 0.16, mats.steelDark);
+      const shiftLink = boxMesh(17.6, 0.16, 0.16, mats.steelDark);
       shiftLink.position.set(0, 5.4, -3.6);
       group.add(shiftLink);
 
@@ -2044,31 +2954,70 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       offset: {},
     },
     (group) => {
-      group.position.set(0, 2.4, 4.4); // Lowered to desk floor level
+      group.position.set(0, 2.4, 4.4); // Desk base level
 
-      // 1. Thin Bottom Floor Pan (Y = 0 relative, beneath all levers)
-      const bottomPan = roundedBoxMesh(40.2, 0.4, 26.4, 0.6, 0.1, mats.enamel);
-      bottomPan.position.set(0, 0.2, 0);
-      bottomPan.castShadow = true;
-      bottomPan.receiveShadow = true;
-      group.add(bottomPan);
+      // 1. 4 Molded Rubber Feet with Brass Washers
+      const feetCoords = [
+        [-17.2, 10.5],
+        [17.2, 10.5],
+        [17.2, -10.5],
+        [-17.2, -10.5],
+      ];
+      for (const [fx, fz] of feetCoords) {
+        // Truncated conical rubber foot puck (rTop: 1.6, rBottom: 1.9, h: 0.6)
+        const foot = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.6, 1.9, 0.6, 24),
+          mats.rubber,
+        );
+        foot.position.set(fx, -0.3, fz);
+        foot.receiveShadow = true;
+        group.add(foot);
 
-      // 2. Left and Right Structural Side Rails
-      for (const side of [-1, 1]) {
-        const sideWall = boxMesh(1.2, 2.8, 26.0, mats.enamel);
-        sideWall.position.set(side * 19.4, 1.4, 0);
-        group.add(sideWall);
+        // Brass center mounting washer
+        const washer = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.0, 1.0, 0.65, 16),
+          mats.brass,
+        );
+        washer.position.set(fx, -0.3, fz);
+        group.add(washer);
+
+        // Internal base boss ring
+        const boss = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.6, 1.8, 0.35, 20),
+          mats.enamel,
+        );
+        boss.position.set(fx, 0.55, fz);
+        group.add(boss);
       }
 
-      // 3. Front Base Cross-Member
-      const frontBase = boxMesh(38.0, 1.8, 1.2, mats.enamel);
-      frontBase.position.set(0, 0.9, 12.6);
-      group.add(frontBase);
+      // 2. Base Pan: Single flat sheet (39.5 x 0.4 x 26.0) sitting at Y = 2.4
+      const basePan = roundedBoxMesh(39.5, 0.4, 26.0, 0.8, 0.08, mats.enamel);
+      basePan.position.set(0, 0.2, 0);
+      basePan.castShadow = true;
+      basePan.receiveShadow = true;
+      group.add(basePan);
 
-      // 4. Rear Frame Cradle (Tucked low at back, Y = 1.6 relative)
-      const rearCradle = boxMesh(26.0, 1.8, 4.2, mats.steelDark);
-      rearCradle.position.set(0, 0.9, -11.0);
-      group.add(rearCradle);
+      // 3. Side Base Ledges & Inner Linkage Clearances
+      for (const side of [-1, 1]) {
+        const sx = side * 18.8;
+        const innerLedge = boxMesh(1.0, 0.8, 22.0, mats.steelDark);
+        innerLedge.position.set(sx, 0.8, 0);
+        group.add(innerLedge);
+      }
+
+      // 4. Rear Transverse Bridge Cross-Member & Escapement Cradle
+      const crossBridge = roundedBoxMesh(37.6, 1.3, 1.5, 0.2, 0.05, mats.enamel);
+      crossBridge.position.set(0, 6.1, -6.8);
+      crossBridge.castShadow = true;
+      group.add(crossBridge);
+
+      const centerBracket = boxMesh(3.4, 2.2, 1.8, mats.steelDark);
+      centerBracket.position.set(0, 5.4, -6.8);
+      group.add(centerBracket);
+
+      const lowerMount = boxMesh(8.0, 1.2, 2.0, mats.steelDark);
+      lowerMount.position.set(0, 0.8, -5.8);
+      group.add(lowerMount);
 
       return null;
     },
@@ -2079,25 +3028,33 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       root,
       {
         id: `frame.sidePanel${side < 0 ? "L" : "R"}`,
-        label: side < 0 ? "Left side panel" : "Right side panel",
-        fn: "Contoured enamel side fender — opens in cutaway view",
+        label: side < 0 ? "Left side fender" : "Right side fender",
+        fn: "Continuous swept side cheek panel — opens in cutaway view",
         system: "frame",
         stagger: 0.86,
         offset: { px: side * 6.5, ry: side * 0.35 },
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 19.6, 8.8, 4.4);
+        group.position.set(side * 19.6, 0, 0);
 
-        // Die-cast contoured cheek panel with rounded corner pillars
-        const panel = roundedBoxMesh(1.1, 8.6, 26.0, 0.45, 0.15, mats.enamelPanel);
-        panel.castShadow = true;
-        group.add(panel);
+        // Continuous swept fender cheek with S-curve silhouette
+        const fender = new THREE.Mesh(createSideFenderGeometry(0.8), mats.enamelPanel);
+        fender.castShadow = true;
+        fender.receiveShadow = true;
+        group.add(fender);
 
-        // Polished nickel accent trim strip
-        const trim = boxMesh(0.18, 0.32, 24.8, mats.nickel);
-        trim.position.set(side * 0.6, 3.8, 0);
+        // Polished nickel accent trim strip along lower rocker
+        const trim = boxMesh(0.18, 0.22, 23.2, mats.nickel);
+        trim.position.set(side * 0.42, 2.6, 4.6);
         group.add(trim);
+
+        // Chrome side mounting boss / fastener at front cheek
+        const fastener = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 14), mats.nickel);
+        fastener.rotation.z = Math.PI / 2;
+        fastener.position.set(side * 0.45, 5.0, 15.2);
+        group.add(fastener);
+
         return null;
       },
     );
@@ -2115,8 +3072,8 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 8.8, -8.6);
-      const back = roundedBoxMesh(40.2, 8.6, 1.1, 0.45, 0.15, mats.enamelPanel);
+      group.position.set(0, 6.8, -7.0);
+      const back = roundedBoxMesh(39.6, 8.8, 0.65, 0.28, 0.08, mats.enamelPanel);
       back.castShadow = true;
       group.add(back);
       return null;
@@ -2135,27 +3092,40 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 7.5, 16.6);
+      group.position.set(0, 5.2, 16.2);
 
-      // Bevelled front apron with rounded corners
-      const brow = roundedBoxMesh(38.4, 3.6, 1.1, 0.4, 0.15, mats.enamelPanel);
-      brow.rotation.x = 0.18;
-      brow.castShadow = true;
-      group.add(brow);
+      // Left and right rounded front cheeks
+      for (const side of [-1, 1]) {
+        const cheek = roundedBoxMesh(5.6, 4.2, 1.6, 0.4, 0.12, mats.enamelPanel);
+        cheek.position.set(side * 17.0, 0, 0);
+        cheek.castShadow = true;
+        group.add(cheek);
+      }
 
-      // Polished vintage brass badge plate
-      const plate = boxMesh(11.5, 1.6, 0.24, mats.brass);
-      plate.position.set(0, 0.45, 0.65);
-      plate.rotation.x = 0.18;
-      group.add(plate);
+      // Low front bottom sill with wide central spacebar cutout (W = 28.5)
+      const sill = roundedBoxMesh(28.5, 1.4, 1.6, 0.25, 0.08, mats.enamelPanel);
+      sill.position.set(0, -1.4, 0);
+      sill.castShadow = true;
+      group.add(sill);
 
-      const name = new THREE.Mesh(
-        new THREE.PlaneGeometry(10.5, 1.2),
-        new THREE.MeshBasicMaterial({ map: keycapTexture("PLATEN", ""), transparent: true }),
+      // Polished brass badge backing plate
+      const badgePlate = boxMesh(12.2, 1.5, 0.15, mats.brass);
+      badgePlate.position.set(0, -1.3, 0.82);
+      badgePlate.rotation.x = 0.08;
+      group.add(badgePlate);
+
+      // Gold badge banner: "PLATEN: 3D TYPEWRITER"
+      const badgeName = new THREE.Mesh(
+        new THREE.PlaneGeometry(12.0, 1.4),
+        new THREE.MeshBasicMaterial({
+          map: buildGoldBadgeTexture("PLATEN", "3D MECHANICAL TYPEWRITER"),
+          transparent: true,
+        }),
       );
-      name.position.set(0, 0.45, 0.79);
-      name.rotation.x = 0.18;
-      group.add(name);
+      badgeName.position.set(0, -1.3, 0.91);
+      badgeName.rotation.x = 0.08;
+      group.add(badgeName);
+
       return null;
     },
   );
@@ -2165,28 +3135,106 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       root,
       {
         id: `frame.deckPlate${side < 0 ? "L" : "R"}`,
-        label: side < 0 ? "Left deck plate" : "Right deck plate",
-        fn: "Top deck plate carrying ribbon spool housing",
+        label: side < 0 ? "Left swept deck cowl" : "Right swept deck cowl",
+        fn: "Continuous contoured enamel cowl with S-curve shoulder and integrated ribbon spool well",
         system: "frame",
         stagger: 0.89,
         offset: { py: 3.2, px: side * 2.5 },
         cutawayFade: true,
       },
       (group) => {
-        group.position.set(side * 13.5, 12.2, -0.5);
-        const deck = roundedBoxMesh(12.0, 0.45, 14.2, 0.3, 0.08, mats.enamelPanel);
-        deck.castShadow = true;
-        deck.receiveShadow = true;
-        group.add(deck);
+        const deckX = side * 13.2;
+        group.position.set(deckX, 0, 0);
 
-        // Circular spool bezel ring
-        const bezel = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, 0.2, 28), mats.nickel);
-        bezel.position.set(side * -5.5, 0.32, 1.0);
+        // Basin X offset in local deck coordinates matching world SPOOL_X = 9.8:
+        const basinX = side * (9.8 - 13.2);
+        const basinZ = 0.5;
+
+        // 1. Continuous swept enamel deck cowl matching side fender S-curve
+        const cowlMesh = new THREE.Mesh(createContouredDeckCowlGeometry(12.0), mats.enamelPanel);
+        cowlMesh.castShadow = true;
+        cowlMesh.receiveShadow = true;
+        group.add(cowlMesh);
+
+        // Top deck plate cover with true circular spool well cutout
+        const coverMesh = new THREE.Mesh(createDeckPlateCoverGeometry(basinX, 12.0, 7.5), mats.enamelPanel);
+        coverMesh.position.set(0, 11.1, -3.25);
+        coverMesh.castShadow = true;
+        coverMesh.receiveShadow = true;
+        group.add(coverMesh);
+
+        // 2. Recessed Cylindrical Spool Basin sitting flush inside the circular cutout (radius: 2.55, depth: 1.1)
+        const basinCup = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.55, 2.55, 1.1, 32, 1, true),
+          mats.enamelPanel,
+        );
+        basinCup.position.set(basinX, 10.65, basinZ);
+        basinCup.castShadow = true;
+        basinCup.receiveShadow = true;
+        group.add(basinCup);
+
+        const basinBottom = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.55, 2.55, 0.12, 32),
+          mats.steelDark,
+        );
+        basinBottom.position.set(basinX, 10.10, basinZ);
+        group.add(basinBottom);
+
+        // 3. Polished Nickel Spool Rim Bezel framing the circular cutout
+        const bezel = new THREE.Mesh(
+          new THREE.TorusGeometry(2.62, 0.08, 12, 48),
+          mats.nickel,
+        );
+        bezel.rotation.x = Math.PI / 2;
+        bezel.position.set(basinX, 11.22, basinZ);
         group.add(bezel);
+
+        // 4. Polished nickel lower front accent trim strip along chassis sill
+        const frontTrim = boxMesh(11.8, 0.22, 0.18, mats.nickel);
+        frontTrim.position.set(0, 2.6, 8.4);
+        group.add(frontTrim);
+
         return null;
       },
     );
   }
+
+  addPart(
+    root,
+    {
+      id: "frame.basketCowl",
+      label: "Basket cradle cowl",
+      fn: "Sculpted U-shaped enamel pan enclosing the typebar mechanism and connecting side swept deck cowls",
+      system: "frame",
+      stagger: 0.895,
+      offset: { py: -2.0, pz: 1.5 },
+      cutawayFade: true,
+    },
+    (group) => {
+      // 1. Sculpted U-shaped basket belly pan enclosing underside of typebar mechanism
+      const cowlGeo = createUnderBasketCowlGeometry(14.4, 0.20);
+      const cowlMesh = new THREE.Mesh(cowlGeo, mats.enamelPanel);
+      cowlMesh.castShadow = true;
+      cowlMesh.receiveShadow = true;
+      group.add(cowlMesh);
+
+      // 2. Nickel front arc trim bead along the forward cowl lip behind the keyboard
+      const beadPoints: THREE.Vector3[] = [];
+      for (let i = 0; i <= 32; i++) {
+        const u = (i / 32) * 2 - 1;
+        const x = u * 7.2;
+        const z = 6.0;
+        const y = (1 - u * u) * 5.8 + (u * u) * 6.0 + 0.06;
+        beadPoints.push(new THREE.Vector3(x, y, z));
+      }
+      const beadCurve = new THREE.CatmullRomCurve3(beadPoints);
+      const beadGeo = new THREE.TubeGeometry(beadCurve, 32, 0.055, 8, false);
+      const beadMesh = new THREE.Mesh(beadGeo, mats.nickel);
+      group.add(beadMesh);
+
+      return null;
+    },
+  );
 
   addPart(
     root,
@@ -2200,44 +3248,13 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
       cutawayFade: true,
     },
     (group) => {
-      group.position.set(0, 12.2, -6.8);
-      const rear = roundedBoxMesh(27.0, 0.45, 3.4, 0.25, 0.08, mats.enamelPanel);
+      group.position.set(0, 11.2, -5.4);
+      const rear = roundedBoxMesh(26.4, 0.45, 2.5, 0.25, 0.08, mats.enamelPanel);
       rear.castShadow = true;
       group.add(rear);
       return null;
     },
   );
-
-  // 4 vulcanized dark rubber support feet
-  for (const [x, z] of [
-    [-17.2, -6.8],
-    [17.2, -6.8],
-    [-17.2, 15.2],
-    [17.2, 15.2],
-  ] as const) {
-    addPart(
-      root,
-      {
-        id: `frame.foot.${x}.${z}`,
-        label: "Rubber support foot",
-        fn: "Vulcanized rubber foot isolating vibration from the desk",
-        system: "frame",
-        stagger: 0.95,
-        offset: { py: -2.2 },
-      },
-      (group) => {
-        group.position.set(x, 2.9, z);
-        const foot = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.45, 1.2, 18), mats.rubber);
-        foot.castShadow = true;
-        group.add(foot);
-
-        const washer = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.15, 18), mats.brass);
-        washer.position.y = 0.6;
-        group.add(washer);
-        return null;
-      },
-    );
-  }
 
   for (const side of [-1, 1]) {
     addPart(
@@ -2297,12 +3314,13 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   const screwData: Array<{ p: THREE.Vector3; n: THREE.Vector3; rotZ: number }> = [];
 
   // Left and Right side panel assembly screws (8 per side)
+  // Left and Right side panel assembly screws (8 per side across length Z in [-5.5, 14.5])
   for (const side of [-1, 1]) {
     for (let i = 0; i < 8; i++) {
-      const zCol = i < 4 ? -6.5 : 12.5;
-      const yRow = 5.6 + (i % 4) * 2.0;
+      const zCol = i < 4 ? -5.5 + i * 2.8 : 6.5 + (i - 4) * 2.2;
+      const yRow = 3.6 + (i % 3) * 2.4;
       screwData.push({
-        p: new THREE.Vector3(side * 20.25, yRow, zCol),
+        p: new THREE.Vector3(side * 20.05, yRow, zCol),
         n: new THREE.Vector3(side, 0, 0),
         rotZ: (i * 0.73) % Math.PI,
       });
@@ -2312,7 +3330,7 @@ export function buildMachine(mats: MachineMaterials, paper: PaperTexture): Machi
   // Rear cowl back panel assembly screws (6 across rear wall)
   for (let i = 0; i < 6; i++) {
     screwData.push({
-      p: new THREE.Vector3(-14 + i * 5.6, 8.8, -9.25),
+      p: new THREE.Vector3(-14 + i * 5.6, 6.8, -7.4),
       n: new THREE.Vector3(0, 0, -1),
       rotZ: (i * 1.1) % Math.PI,
     });

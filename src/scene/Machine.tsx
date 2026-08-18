@@ -109,6 +109,7 @@ export function Machine() {
   const explodeRef = useRef(0);
   const paperLineRef = useRef(0);
   const screwProgressRef = useRef(-1);
+  const carriageXRef = useRef(CARRIAGE_HOME_X);
 
   const selectedPart = useStore((s) => s.selectedPart);
   const trace = useStore((s) => s.trace);
@@ -250,7 +251,9 @@ export function Machine() {
     const cellWidthPx = currentFontSize * 0.62 * currentLetterSpacing;
     const dynamicCarriageStep = cellWidthPx * (21.0 / 2480);
 
-    build.refs.carriageGroup.position.x = CARRIAGE_HOME_X - machine.carriageCols * dynamicCarriageStep;
+    const targetCarriageX = CARRIAGE_HOME_X - machine.carriageCols * dynamicCarriageStep;
+    carriageXRef.current += (targetCarriageX - carriageXRef.current) * 0.58;
+    build.refs.carriageGroup.position.x = carriageXRef.current;
     build.refs.platenAction.rotation.x = machine.platenRotation;
     build.refs.ratchetAction.rotation.x = machine.platenRotation;
     build.refs.escapeWheelAction.rotation.z = -machine.escapeWheelAngle;
@@ -286,17 +289,17 @@ export function Machine() {
     tipR.set(0.85, 13.65 + lift * 0.65, -1.36 - lift * 0.08);
 
     // Left ribbon path: wraps around left spool, passes guide post, sweeps across basket with natural cloth drape into vibrator
-    const pSpoolL = new THREE.Vector3(-6.15, 13.25, 0.55);
-    const pGuideL = new THREE.Vector3(-5.80, 13.25, 0.40);
-    const pMidL = new THREE.Vector3(-3.50, 13.38, -0.42);
-    const pNearL = new THREE.Vector3(-1.60, 13.52, -1.02);
+    const pSpoolL = new THREE.Vector3(-7.95, 13.25, 0.55);
+    const pGuideL = new THREE.Vector3(-7.55, 13.25, 0.40);
+    const pMidL = new THREE.Vector3(-4.60, 13.38, -0.42);
+    const pNearL = new THREE.Vector3(-1.80, 13.52, -1.02);
     updateWavyRibbon(build.refs.ribbonSideL, [pSpoolL, pGuideL, pMidL, pNearL, tipL], 0.52, -1);
 
     // Right ribbon path: leaves vibrator, sweeps across basket with natural cloth drape, passes guide post, wraps around right spool
-    const pNearR = new THREE.Vector3(1.60, 13.52, -1.02);
-    const pMidR = new THREE.Vector3(3.50, 13.38, -0.42);
-    const pGuideR = new THREE.Vector3(5.80, 13.25, 0.40);
-    const pSpoolR = new THREE.Vector3(6.15, 13.25, 0.55);
+    const pNearR = new THREE.Vector3(1.80, 13.52, -1.02);
+    const pMidR = new THREE.Vector3(4.60, 13.38, -0.42);
+    const pGuideR = new THREE.Vector3(7.55, 13.25, 0.40);
+    const pSpoolR = new THREE.Vector3(7.95, 13.25, 0.55);
     updateWavyRibbon(build.refs.ribbonSideR, [tipR, pNearR, pMidR, pGuideR, pSpoolR], 0.52, 1);
 
     // --- Upper return guide visibility toggle according to feedMode ---

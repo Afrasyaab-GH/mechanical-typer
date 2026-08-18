@@ -59,7 +59,9 @@ export class MechanicalAudio {
   /** Create or resume the AudioContext after user interaction. */
   unlock(): void {
     if (this.ctx) {
-      if (this.ctx.state === "suspended") void this.ctx.resume();
+      if (this.ctx.state === "suspended") {
+        this.ctx.resume().catch(() => {});
+      }
       return;
     }
     try {

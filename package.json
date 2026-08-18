@@ -1,8 +1,31 @@
 {
   "name": "platen-3d-typewriter",
-  "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "An authentic, physically-modeled, photorealistic 3D mechanical typewriter simulator built with React 19, Three.js, and Web Audio API.",
   "type": "module",
+  "homepage": "https://afrasyaab-gh.github.io/Mechanical-Typer/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Afrasyaab-GH/Mechanical-Typer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Afrasyaab-GH/Mechanical-Typer/issues"
+  },
+  "license": "MIT",
+  "author": "Afrasyaab-GH and Platen Contributors",
+  "keywords": [
+    "typewriter",
+    "threejs",
+    "react-three-fiber",
+    "mechanical-simulation",
+    "procedural-3d",
+    "web-audio",
+    "photorealistic",
+    "kinematics",
+    "typewriter-simulator",
+    "vintage",
+    "typography"
+  ],
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc -b && vite build",
